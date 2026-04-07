@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Navigate, Route, Routes } from "react-router-dom"
 
-import { AppShell } from "@/components/app-shell"
+import { AppShell } from "@/components/layout/AppShell"
 import { Toaster } from "@/components/ui/sonner"
 import { InsightsPage } from "@/features/insights/insights-page"
 import { QueuePage } from "@/features/queue/queue-page"

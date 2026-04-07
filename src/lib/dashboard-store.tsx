@@ -1,12 +1,15 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
-import { customerAccounts, queueStats, tasks as initialTasks, triageFeed } from "@/lib/mock-data"
+import { defaulters, queueStats } from "@/data/defaulters"
+import { taskItems as initialTasks } from "@/data/tasks"
+import { triageReplies } from "@/data/triageReplies"
+import { buildMessageTemplate } from "@/lib/messageTemplate"
 import type {
   Channel,
   CloseOutcome,
-  QueueStat,
   CustomerAccount,
+  QueueStat,
   TaskItem,
   TaskStatus,
   TriageItem,
@@ -35,9 +38,9 @@ function formatCurrency(value: number) {
 }
 
 export function DashboardStoreProvider({ children }: { children: ReactNode }) {
-  const [customers, setCustomers] = useState(customerAccounts)
+  const [customers, setCustomers] = useState(defaulters)
   const [tasks, setTasks] = useState(initialTasks)
-  const triageItems = triageFeed
+  const triageItems = triageReplies
 
   const sendReminder = (customerId: string, channel: Channel, message: string) => {
     const customer = customers.find((entry) => entry.id === customerId)
@@ -54,6 +57,15 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
               lastAction: `Sent via ${channel} just now`,
               lastChannel: channel,
               draftMessage: message,
+              trackFeed: [
+                {
+                  id: `track-${customerId}-${Date.now()}`,
+                  timestamp: "Just now",
+                  type: "Reminder Sent",
+                  description: `${channel} reminder sent from AI Composer.`,
+                },
+                ...entry.trackFeed,
+              ],
             }
           : entry
       )
@@ -68,7 +80,7 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
       return ""
     }
 
-    const regenerated = `${customer.draftMessage} Please reply with your expected payment date today so we can update the account appropriately.`
+    const regenerated = `${buildMessageTemplate(customer)} Please reply with your expected payment date today so we can update the account appropriately.`
 
     setCustomers((current) =>
       current.map((entry) =>
@@ -144,20 +156,20 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
     toast.success(`Task closed: ${outcome}`)
   }
 
-  const value = {
-    queueStats,
-    customers,
-    triageItems,
-    tasks,
-    sendReminder,
-    regenerateDraft,
-    createTask,
-    updateTaskStatus,
-    closeTask,
-  }
-
   return (
-    <DashboardStoreContext.Provider value={value}>
+    <DashboardStoreContext.Provider
+      value={{
+        queueStats,
+        customers,
+        triageItems,
+        tasks,
+        sendReminder,
+        regenerateDraft,
+        createTask,
+        updateTaskStatus,
+        closeTask,
+      }}
+    >
       {children}
     </DashboardStoreContext.Provider>
   )
