@@ -20,9 +20,12 @@ const primaryItems: SidebarItem[] = [
 ]
 
 const secondaryItems: SidebarItem[] = [
-  { label: "Notifications", icon: Bell, trailing: <span className="rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[11px] font-medium text-[#7C3AED]">3</span> },
-  { label: "Settings", icon: Settings2 },
-]
+  {
+    label: "Notifications",
+    icon: Bell,
+    trailing: <span className="rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[11px] font-medium text-[#7C3AED]">3</span>
+  },
+];
 
 function SidebarNavItem({
   item,
