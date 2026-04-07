@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   flexRender,
   getCoreRowModel,
@@ -10,7 +10,9 @@ import { Send } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useDashboardStore } from "@/lib/dashboard-store"
 import type { CustomerAccount } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -49,6 +51,7 @@ export function DefaulterQueueTable({
   onSelectionChange: (count: number) => void
 }) {
   const navigate = useNavigate()
+  const { isQueueLoading } = useDashboardStore()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const columns = useMemo<ColumnDef<CustomerAccount>[]>(
@@ -170,7 +173,7 @@ export function DefaulterQueueTable({
     state: { rowSelection },
   })
 
-  useMemo(() => {
+  useEffect(() => {
     onSelectionChange(Object.keys(rowSelection).length)
   }, [onSelectionChange, rowSelection])
 
@@ -192,15 +195,23 @@ export function DefaulterQueueTable({
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id} className="group h-12 border-b border-[#F3F4F6] hover:bg-[#F5F3FF]">
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id} className="px-4 py-3 align-middle text-sm text-[#111827]">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
+          {isQueueLoading
+            ? Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={`queue-skeleton-${index}`} className="h-12 border-b border-[#F3F4F6]">
+                  <TableCell colSpan={columns.length} className="px-4 py-3">
+                    <Skeleton className="h-10 w-full rounded-xl" />
+                  </TableCell>
+                </TableRow>
+              ))
+            : table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} className="group h-12 border-b border-[#F3F4F6] hover:bg-[#F5F3FF]">
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="px-4 py-3 align-middle text-sm text-[#111827]">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
               ))}
-            </TableRow>
-          ))}
         </TableBody>
       </Table>
     </div>

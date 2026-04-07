@@ -40,6 +40,20 @@ export interface CustomerAccount {
   draftMessage: string
   creditsUsed: number
   trackFeed: TrackEvent[]
+  invoiceId?: string
+  agingBucket?: AgingBucketType
+  netPayable?: number
+  riskLabel?: RiskLevel
+  recommendedChannel?: Channel
+  reminderSendToday?: boolean
+  nextReminderChannel?: Channel
+  riskScore?: number
+  payerCategory?: string
+  defaulterFlag?: boolean
+  writeoffRate?: number
+  partialRate?: number
+  recoveryRate?: number
+  avgDaysLate?: number
 }
 
 export interface TriageItem {
@@ -63,6 +77,12 @@ export interface TaskItem {
   assignedTo: string
   notes: string
   auditTrail: string[]
+  taskId?: string
+  invoiceId?: string
+  createdDate?: string
+  dueDate?: string
+  escalationFlag?: boolean
+  auditLog?: string[]
 }
 
 export interface QueueStat {
@@ -70,4 +90,23 @@ export interface QueueStat {
   value: string
   detail: string
   delta: string
+}
+
+export interface TriageResult {
+  invoiceId: string
+  category: string
+  summary: string
+  triageAction: Record<string, unknown>
+  taskCreated: boolean
+}
+
+export interface InteractionLog {
+  id: string
+  timestamp: string
+  type: string
+  description: string
+  channel?: string
+  actor?: string
+  status?: string
+  raw?: Record<string, unknown>
 }
