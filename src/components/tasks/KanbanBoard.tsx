@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useDashboardStore } from "@/lib/dashboard-store"
 import type { CloseOutcome, TaskItem, TaskStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -28,7 +29,7 @@ const outcomeStyles: Record<CloseOutcome, string> = {
 }
 
 export function KanbanBoard() {
-  const { tasks, updateTaskStatus, closeTask } = useDashboardStore()
+  const { tasks, updateTaskStatus, closeTask, isTasksLoading } = useDashboardStore()
   const [closeCandidate, setCloseCandidate] = useState<TaskItem | null>(null)
 
   const groupedTasks = useMemo(
@@ -78,34 +79,43 @@ export function KanbanBoard() {
     <>
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid gap-6 xl:grid-cols-3">
-          {columns.map((column) => (
-            <div key={column.key} className="rounded-2xl bg-white p-4 card-shadow">
-              <div className={cn("rounded-xl px-4 py-3", column.className)}>
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold">{column.key}</h3>
-                  <span className="text-xs font-medium">{groupedTasks[column.key].length}</span>
-                </div>
-              </div>
-
-              <Droppable droppableId={column.key}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={cn(
-                      "mt-4 min-h-[520px] space-y-3 rounded-2xl p-2 transition-colors",
-                      snapshot.isDraggingOver && "border border-dashed border-[#7C3AED] bg-[#F5F3FF]"
-                    )}
-                  >
-                    {groupedTasks[column.key].map((task, index) => (
-                      <TaskCard key={task.id} task={task} index={index} onMarkClosed={setCloseCandidate} />
-                    ))}
-                    {provided.placeholder}
+          {isTasksLoading
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <div key={`kanban-skeleton-${index}`} className="rounded-2xl bg-white p-4 card-shadow">
+                  <Skeleton className="h-12 w-full rounded-xl" />
+                  <div className="mt-4 space-y-3 rounded-2xl p-2">
+                    <Skeleton className="h-28 w-full rounded-xl" />
                   </div>
-                )}
-              </Droppable>
-            </div>
-          ))}
+                </div>
+              ))
+            : columns.map((column) => (
+                <div key={column.key} className="rounded-2xl bg-white p-4 card-shadow">
+                  <div className={cn("rounded-xl px-4 py-3", column.className)}>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold">{column.key}</h3>
+                      <span className="text-xs font-medium">{groupedTasks[column.key].length}</span>
+                    </div>
+                  </div>
+
+                  <Droppable droppableId={column.key}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={cn(
+                          "mt-4 min-h-[520px] space-y-3 rounded-2xl p-2 transition-colors",
+                          snapshot.isDraggingOver && "border border-dashed border-[#7C3AED] bg-[#F5F3FF]"
+                        )}
+                      >
+                        {groupedTasks[column.key].map((task, index) => (
+                          <TaskCard key={task.id} task={task} index={index} onMarkClosed={setCloseCandidate} />
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              ))}
         </div>
       </DragDropContext>
 

@@ -1,4 +1,4 @@
-import { Bell, ChevronRight, Lightbulb, ListTodo, Settings2, Sparkles, type LucideIcon } from "lucide-react"
+import { Bell, ChevronRight, Lightbulb, ListTodo, Sparkles, type LucideIcon } from "lucide-react"
 import { NavLink } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
