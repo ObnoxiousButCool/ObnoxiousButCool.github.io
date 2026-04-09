@@ -21,7 +21,7 @@ export function RemindersPage() {
     }
 
     void loadInteractions(selectedCustomer.id)
-  }, [loadInteractions, selectedCustomer])
+  }, [selectedCustomer?.id])
 
   if (!selectedCustomer) {
     return (

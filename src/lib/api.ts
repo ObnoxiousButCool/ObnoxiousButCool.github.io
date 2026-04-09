@@ -53,6 +53,7 @@ interface TaskApiResponse {
 interface ReminderApiResponse {
   invoice_id: string
   channel: string
+  ai_recommended_channel: string   // ← new: what AI suggests
   message: string
 }
 
@@ -62,6 +63,16 @@ interface TriageApiResponse {
   summary: string
   triage_action: Record<string, unknown>
   task_created: boolean
+}
+
+interface DispatchApiResponse {
+  invoice_id: string
+  success: boolean
+  channel_requested: string
+  channel_used: string
+  fallback_used: boolean
+  attempted_channels: string[]
+  message_sid: string | null
 }
 
 export interface QueueCustomer {
@@ -92,8 +103,19 @@ export interface RiskProfile {
 
 export interface ReminderDraft {
   invoiceId: string
-  channel: Channel
+  channel: Channel               // channel the message was generated for (user's choice)
+  aiRecommendedChannel: Channel  // ← new: AI's suggestion, shown as badge in UI
   message: string
+}
+
+export interface DispatchResult {
+  invoiceId: string
+  success: boolean
+  channelRequested: Channel
+  channelUsed: Channel
+  fallbackUsed: boolean
+  attemptedChannels: Channel[]
+  messageSid: string | null
 }
 
 export class ApiError extends Error {
@@ -206,6 +228,7 @@ function mapReminder(item: ReminderApiResponse): ReminderDraft {
   return {
     invoiceId: item.invoice_id,
     channel: normalizeChannel(item.channel),
+    aiRecommendedChannel: normalizeChannel(item.ai_recommended_channel),
     message: item.message,
   }
 }
@@ -217,6 +240,18 @@ function mapTriageResult(item: TriageApiResponse): TriageResult {
     summary: item.summary,
     triageAction: item.triage_action,
     taskCreated: item.task_created,
+  }
+}
+
+function mapDispatchResult(item: DispatchApiResponse): DispatchResult {
+  return {
+    invoiceId: item.invoice_id,
+    success: item.success,
+    channelRequested: normalizeChannel(item.channel_requested),
+    channelUsed: normalizeChannel(item.channel_used),
+    fallbackUsed: item.fallback_used,
+    attemptedChannels: item.attempted_channels.map(normalizeChannel),
+    messageSid: item.message_sid,
   }
 }
 
@@ -252,14 +287,15 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const payload = isJson ? await response.json() : await response.text()
 
   if (!response.ok) {
+    console.log("RAW BODY:", options.body)
     const message =
       typeof payload === "string"
         ? payload || response.statusText
         : String(
-            (payload as { message?: unknown; detail?: unknown }).message ??
-              (payload as { detail?: unknown }).detail ??
-              response.statusText
-          )
+          (payload as { message?: unknown; detail?: unknown }).message ??
+          (payload as { detail?: unknown }).detail ??
+          response.statusText
+        )
 
     throw new ApiError(response.status, message)
   }
@@ -291,13 +327,30 @@ export async function updateTask(id: string, status: string, note?: string) {
   return mapTask(data)
 }
 
-export async function generateReminder(invoiceId: string) {
+// Pass user's chosen channel to backend so message is generated for that channel.
+// Backend will also return aiRecommendedChannel separately for UI badge display.
+export async function generateReminder(invoiceId: string, userChannel?: Channel) {
+  const body: Record<string, string> = { invoice_id: invoiceId }
+  if (userChannel) {
+    body.channel = userChannel
+  }
+
   const data = await apiFetch<ReminderApiResponse>("/api/reminders/generate", {
     method: "POST",
-    body: JSON.stringify({ invoice_id: invoiceId }),
+    body: JSON.stringify(body),
   })
 
   return mapReminder(data)
+}
+
+export async function dispatchReminder(customerId: string, channel: Channel, message: string) {
+  console.log("ARGS:", { customerId, channel, message })
+  const data = await apiFetch<DispatchApiResponse>("/api/dispatch", {
+    method: "POST",
+    body: JSON.stringify({ customerId, channel, message }),
+  })
+
+  return mapDispatchResult(data)
 }
 
 export async function submitTriage(invoiceId: string, responseText: string) {

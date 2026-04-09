@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { toast } from "sonner"
-
+import { useCallback } from "react"
 import {
+  dispatchReminder,
   fetchInteractions,
   fetchProfiles,
   fetchQueue,
@@ -301,57 +302,59 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
     toast.info("Manual task creation is not available on the live backend")
   }
 
-  const loadInteractions = async (customerId: string) => {
+  const loadInteractions = useCallback(async (customerId: string) => {
     try {
       const interactions = await fetchInteractions(customerId)
       const trackFeed = interactions.map(toTrackEvent)
 
       setCustomers((current) =>
-        current.map((customer) => (customer.id === customerId ? { ...customer, trackFeed } : customer))
+        current.map((customer) =>
+          customer.id === customerId ? { ...customer, trackFeed } : customer
+        )
       )
     } catch {
       toast.error("Failed to load interactions")
     }
-  }
+  }, [])
 
   const sendReminder = (customerId: string, channel: Channel, message: string) => {
     void (async () => {
       try {
-        const reminder = await generateReminder(customerId)
+        const result = await dispatchReminder(customerId, channel, message)
 
         setCustomers((current) =>
           current.map((customer) =>
             customer.id === customerId
               ? {
-                  ...customer,
-                  reminderCount: customer.reminderCount + 1,
-                  lastAction: "Reminder sent just now",
-                  lastChannel: reminder.channel,
-                  draftMessage: reminder.message,
-                  trackFeed: [
-                    {
-                      id: `track-${customerId}-${Date.now()}`,
-                      timestamp: "Just now",
-                      type: "Reminder Sent",
-                      description: reminder.message,
-                    },
-                    ...customer.trackFeed,
-                  ],
-                }
+                ...customer,
+                reminderCount: customer.reminderCount + 1,
+                lastAction: "Reminder sent just now",
+                lastChannel: result.channelUsed,
+                draftMessage: message,
+                trackFeed: [
+                  {
+                    id: `track-${customerId}-${Date.now()}`,
+                    timestamp: "Just now",
+                    type: "Reminder Sent",
+                    description: message,
+                  },
+                  ...customer.trackFeed,
+                ],
+              }
               : customer
           )
         )
 
-        toast.success(`${reminder.channel} reminder sent`)
+        toast.success(`${result.channelUsed} reminder sent`)
       } catch {
         setCustomers((current) =>
           current.map((customer) =>
             customer.id === customerId
               ? {
-                  ...customer,
-                  lastChannel: channel,
-                  draftMessage: message,
-                }
+                ...customer,
+                lastChannel: channel,
+                draftMessage: message,
+              }
               : customer
           )
         )
@@ -379,14 +382,14 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
               latest && latest.type === "Reminder Sent"
                 ? [{ ...latest, description: reminder.message }, ...rest]
                 : [
-                    {
-                      id: `track-${customerId}-${Date.now()}`,
-                      timestamp: "Just now",
-                      type: "Reminder Sent",
-                      description: reminder.message,
-                    },
-                    ...customer.trackFeed,
-                  ]
+                  {
+                    id: `track-${customerId}-${Date.now()}`,
+                    timestamp: "Just now",
+                    type: "Reminder Sent",
+                    description: reminder.message,
+                  },
+                  ...customer.trackFeed,
+                ]
 
             return {
               ...customer,
