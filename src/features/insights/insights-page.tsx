@@ -1,10 +1,16 @@
-import { EmptyStateCard } from "@/components/empty-state-card"
+import { BarChart2 } from "lucide-react"
 
 export function InsightsPage() {
   return (
-    <EmptyStateCard
-      title="Insights coming in v2"
-      description="Collection KPIs, aging trend, and response rate are intentionally deferred to v2. This MVP keeps the tab visible so the information architecture matches the launch plan without introducing charts or out-of-scope analytics."
-    />
+    <section className="flex min-h-[70vh] items-center justify-center">
+      <div className="rounded-2xl bg-white px-10 py-12 text-center card-shadow">
+        <BarChart2 className="mx-auto h-14 w-14 text-[#C4B5FD]" />
+        <h2 className="mt-6 text-[20px] font-semibold text-[#374151]">Insights coming in v2</h2>
+        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#9CA3AF]">
+          Collection trends, response rates by channel, and aging analysis will appear here after your first 30 days
+          of data.
+        </p>
+      </div>
+    </section>
   )
 }
