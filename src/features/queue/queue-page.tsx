@@ -11,7 +11,7 @@ import { useDashboardStore } from "@/lib/dashboard-store"
 import { cn } from "@/lib/utils"
 
 const agingFilters = ["All", "30 days", "45 days", "60+ days"] as const
-const payerFilters = ["All", "Insurance", "Self-pay"] as const
+const payerFilters = ["All", "INS & TPA", "CORPORATE", "N.G.O", "PAY PATIENT", "GOVERNMENT"] as const
 
 export function QueuePage() {
   const navigate = useNavigate()
@@ -21,19 +21,40 @@ export function QueuePage() {
   const [payerFilter, setPayerFilter] = useState<(typeof payerFilters)[number]>("All")
   const [selectedCount, setSelectedCount] = useState(0)
   const [showSummary, setShowSummary] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryText, setSummaryText] = useState<string | null>(null)
 
   const filteredRows = useMemo(
     () =>
       customers.filter((customer) => {
         const value = `${customer.customerName} ${customer.accountRef}`.toLowerCase()
         const matchesQuery = value.includes(query.toLowerCase())
-        const matchesAging = agingFilter === "All" || customer.bucket === agingFilter
-        const matchesPayer = payerFilter === "All" || customer.payerType === payerFilter
+        const matchesAging = agingFilter === "All" || customer.agingBucket === agingFilter
+        const matchesPayer = payerFilter === "All" || customer.payerCategory === payerFilter
 
         return matchesQuery && matchesAging && matchesPayer
       }),
     [agingFilter, customers, payerFilter, query]
   )
+
+const handleAISummary = async () => {
+  if (summaryText) {
+    setShowSummary((v) => !v)
+    return
+  }
+  setShowSummary(true)
+  setSummaryLoading(true)
+  try {
+    const response = await fetch("http://localhost:8000/api/ai-summary")
+    const data = await response.json()
+    setSummaryText(data.summary)
+  } catch (err) {
+    console.error("Summary error:", err)
+    setSummaryText(`Error: ${err instanceof Error ? err.message : String(err)}`)
+  } finally {
+    setSummaryLoading(false)
+  }
+}
 
   return (
     <section className="space-y-6">
@@ -46,7 +67,7 @@ export function QueuePage() {
         </div>
         <Button
           className="rounded-full bg-[#7C3AED] px-4 text-sm font-medium text-white hover:bg-[#6D28D9]"
-          onClick={() => setShowSummary((value) => !value)}
+          onClick={handleAISummary}
         >
           AI Summary ↗
         </Button>
@@ -54,8 +75,7 @@ export function QueuePage() {
 
       {showSummary ? (
         <div className="rounded-2xl bg-white p-5 text-sm leading-6 text-[#6B7280] card-shadow">
-          AI is prioritizing Ramesh Patil, Meera Diagnostics, and Sunita Medicare first because they combine higher
-          aging, larger balances, and weaker recent response signals.
+          {summaryLoading ? "Generating AI summary…" : summaryText}
         </div>
       ) : null}
 
