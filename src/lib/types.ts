@@ -2,6 +2,7 @@ export type AgingBucketType = "30 days" | "45 days" | "60+ days"
 export type RiskLevel = "High Risk" | "Watch" | "Normal"
 export type ModifierType = "Penalty" | "Incentive"
 export type Channel = "Email" | "SMS" | "WhatsApp"
+export type AmountTier = "<₹10K" | "₹10K–₹50K" | "₹50K–₹1L" | ">₹1L"
 export type TriageClassification = "Commitment" | "Disputed" | "No response"
 export type TaskStatus = "Open" | "In Progress" | "Closed"
 export type CloseOutcome = "Yes" | "No" | "Partial"
@@ -27,13 +28,30 @@ export interface CustomerAccount {
   bucket: AgingBucketType
   outstanding: number
   riskLevel: RiskLevel
-  modifierType: ModifierType
-  modifierLabel: string
+  amountTier?: AmountTier
+  reminderStrategy?: string
+  reminderStyle?: string
+  maxReminders?: number
+  remindersSent?: number
+  reminderLimitReached?: boolean
+  escalationThresholdDays?: number
+  escalationRequired?: boolean
+  managerInvolvement?: boolean
+  cfoNotificationRequired?: boolean
+  vipQueueEligible?: boolean
+  automatedChannels?: Channel[]
+  allowedChannels?: string[]
+  playbookSteps?: string[]
+  nextAction?: string
+  manualFollowUpRequired?: boolean
+  reminderReason?: string
+  modifierType: ModifierType | null
+  modifierLabel: string | null
   modifierValue: string
   statusLabel: string
   reminderCount: number
   lastAction: string
-  lastChannel: Channel
+  lastChannel: string
   responseHistory: string[]
   aiPriorityScore: number
   aiSummary: string
@@ -44,9 +62,9 @@ export interface CustomerAccount {
   agingBucket?: AgingBucketType
   netPayable?: number
   riskLabel?: RiskLevel
-  recommendedChannel?: Channel
+  recommendedChannel?: string
   reminderSendToday?: boolean
-  nextReminderChannel?: Channel
+  nextReminderChannel?: string
   riskScore?: number
   payerCategory?: string
   defaulterFlag?: boolean
@@ -90,6 +108,13 @@ export interface QueueStat {
   value: string
   detail: string
   delta: string
+}
+
+export interface AmountTierBreakdownItem {
+  label: AmountTier
+  value: string
+  percentage: number
+  count: number
 }
 
 export interface TriageResult {

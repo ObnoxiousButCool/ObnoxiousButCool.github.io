@@ -3,6 +3,7 @@ import { Search } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 import { BulkActionBar } from "@/components/queue/BulkActionBar"
+import { AmountTierBreakdown } from "@/components/queue/AmountTierBreakdown"
 import { DefaulterQueueTable } from "@/components/queue/DefaulterQueueTable"
 import { StatCards } from "@/components/queue/StatCards"
 import { Button } from "@/components/ui/button"
@@ -11,14 +12,25 @@ import { useDashboardStore } from "@/lib/dashboard-store"
 import { cn } from "@/lib/utils"
 
 const agingFilters = ["All", "30 days", "45 days", "60+ days"] as const
+const amountFilters = ["All", "<₹10K", "₹10K–50K", ">₹50K", ">₹1L"] as const
 const payerFilters = ["All", "INS & TPA", "CORPORATE", "N.G.O", "PAY PATIENT", "GOVERNMENT"] as const
+
+function matchesAmountFilter(outstanding: number, filter: (typeof amountFilters)[number]) {
+  if (filter === "<₹10K") return outstanding < 10000
+  if (filter === "₹10K–50K") return outstanding >= 10000 && outstanding <= 50000
+  if (filter === ">₹50K") return outstanding > 50000
+  if (filter === ">₹1L") return outstanding > 100000
+  return true
+}
 
 export function QueuePage() {
   const navigate = useNavigate()
-  const { queueStats, customers, createTask } = useDashboardStore()
+  const { queueStats, amountBreakdown, customers, createTask } = useDashboardStore()
   const [query, setQuery] = useState("")
   const [agingFilter, setAgingFilter] = useState<(typeof agingFilters)[number]>("All")
+  const [amountFilter, setAmountFilter] = useState<(typeof amountFilters)[number]>("All")
   const [payerFilter, setPayerFilter] = useState<(typeof payerFilters)[number]>("All")
+  const [vipOnly, setVipOnly] = useState(false)
   const [selectedCount, setSelectedCount] = useState(0)
   const [showSummary, setShowSummary] = useState(false)
   const [summaryLoading, setSummaryLoading] = useState(false)
@@ -29,13 +41,17 @@ export function QueuePage() {
       customers.filter((customer) => {
         const value = `${customer.customerName} ${customer.accountRef}`.toLowerCase()
         const matchesQuery = value.includes(query.toLowerCase())
-        const matchesAging = agingFilter === "All" || customer.agingBucket === agingFilter
-        const matchesPayer = payerFilter === "All" || customer.payerCategory === payerFilter
+        const matchesAging = agingFilter === "All" || (customer.agingBucket || customer.bucket) === agingFilter
+        const matchesAmount = matchesAmountFilter(customer.outstanding, amountFilter)
+        const matchesPayer = payerFilter === "All" || (customer.payerCategory || customer.payerType) === payerFilter
+        const matchesVip = !vipOnly || customer.vipQueueEligible
 
-        return matchesQuery && matchesAging && matchesPayer
+        return matchesQuery && matchesAging && matchesAmount && matchesPayer && matchesVip
       }),
-    [agingFilter, customers, payerFilter, query]
+    [agingFilter, amountFilter, customers, payerFilter, query, vipOnly]
   )
+
+  const vipCount = useMemo(() => customers.filter((customer) => customer.vipQueueEligible).length, [customers])
 
 const handleAISummary = async () => {
   if (summaryText) {
@@ -81,6 +97,8 @@ const handleAISummary = async () => {
 
       <StatCards stats={queueStats} />
 
+      <AmountTierBreakdown items={amountBreakdown} />
+
       <div className="space-y-5 rounded-2xl bg-transparent">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="relative w-full max-w-md">
@@ -108,6 +126,35 @@ const handleAISummary = async () => {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {amountFilters.map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setAmountFilter(filter)}
+                className={cn(
+                  "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                  amountFilter === filter ? "bg-[#111827] text-white" : "bg-white text-[#6B7280] hover:text-[#111827]"
+                )}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setVipOnly((current) => !current)}
+            className={cn(
+              "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+              vipOnly ? "bg-[#DC2626] text-white" : "bg-white text-[#B91C1C] hover:bg-[#FEF2F2]"
+            )}
+          >
+            VIP Queue ({vipCount})
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

@@ -56,6 +56,18 @@ export function CustomerList({
             >
               {customer.agingDays} days
             </span>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {customer.amountTier ? (
+                <span className="rounded-full bg-[#EEF2FF] px-2 py-0.5 text-[10px] font-semibold text-[#4338CA]">
+                  {customer.amountTier}
+                </span>
+              ) : null}
+              {customer.vipQueueEligible ? (
+                <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-semibold text-[#B91C1C]">
+                  VIP
+                </span>
+              ) : null}
+            </div>
           </button>
         ))}
       </div>

@@ -18,6 +18,7 @@ import type {
   Channel,
   CloseOutcome,
   CustomerAccount,
+  AmountTierBreakdownItem,
   InteractionLog,
   QueueStat,
   TaskItem,
@@ -31,6 +32,7 @@ import type {
 
 interface DashboardStoreValue {
   queueStats: QueueStat[]
+  amountBreakdown: AmountTierBreakdownItem[]
   customers: CustomerAccount[]
   triageItems: TriageItem[]
   tasks: TaskItem[]
@@ -38,7 +40,7 @@ interface DashboardStoreValue {
   isTasksLoading: boolean
   isTriageLoading: boolean
   sendReminder: (customerId: string, channel: Channel, message: string) => void
-  regenerateDraft: (customerId: string) => string
+  regenerateDraft: (customerId: string) => Promise<string>
   createTask: (customerId: string) => void
   updateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>
   closeTask: (taskId: string, outcome: CloseOutcome) => Promise<void>
@@ -56,6 +58,15 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
+const amountTierLabels: AmountTierBreakdownItem["label"][] = ["<₹10K", "₹10K–₹50K", "₹50K–₹1L", ">₹1L"]
+
+function amountTierFromOutstanding(value: number): AmountTierBreakdownItem["label"] {
+  if (value > 100000) return ">₹1L"
+  if (value > 50000) return "₹50K–₹1L"
+  if (value >= 10000) return "₹10K–₹50K"
+  return "<₹10K"
+}
+
 function mapClassification(value: string): TriageClassification {
   const normalized = value.trim().toLowerCase()
   if (normalized.includes("commit")) return "Commitment"
@@ -65,7 +76,7 @@ function mapClassification(value: string): TriageClassification {
 
 function mapTrackEventType(value: string): TrackEventType {
   const normalized = value.trim().toLowerCase()
-  if (normalized.includes("reply")) return "Reply Received"
+  if (normalized.includes("reply") || normalized.includes("response")) return "Reply Received"
   if (normalized.includes("task")) return "Task Created"
   if (normalized.includes("flag")) return "Flag Updated"
   return "Reminder Sent"
@@ -74,7 +85,7 @@ function mapTrackEventType(value: string): TrackEventType {
 /**
  * ✅ NEW: Backend-driven modifier logic ONLY
  */
-function getModifier(customer: QueueCustomer) {
+function getModifier(customer: QueueCustomer): { type: CustomerAccount["modifierType"]; label: string | null; value: string } {
   const penalty = Number(customer.penaltyAmount || 0)
   const incentive = Number(customer.incentiveAmount || 0)
   const outstanding = Number(customer.outstanding || 0)
@@ -82,7 +93,7 @@ function getModifier(customer: QueueCustomer) {
   if (penalty > 0) {
     const percent = outstanding > 0 ? Math.round((penalty / outstanding) * 100) : 0
     return {
-      type: "penalty",
+      type: "Penalty",
       label: `+${percent}% penalty`,
       value: customer.financialNote,
     }
@@ -91,7 +102,7 @@ function getModifier(customer: QueueCustomer) {
   if (incentive > 0) {
     const percent = outstanding > 0 ? Math.round((incentive / outstanding) * 100) : 0
     return {
-      type: "incentive",
+      type: "Incentive",
       label: `-${percent}% incentive`,
       value: customer.financialNote,
     }
@@ -111,6 +122,8 @@ function getStatusLabel(customer: QueueCustomer, profile?: RiskProfile) {
 }
 
 function getLastAction(customer: QueueCustomer) {
+  if (customer.nextAction) return customer.nextAction
+  if (customer.manualFollowUpRequired) return customer.reminderReason
   return customer.reminderSendToday ? "Reminder due today" : "Awaiting follow-up"
 }
 
@@ -118,11 +131,10 @@ function getAiSummary(customer: QueueCustomer, profile?: RiskProfile) {
   const payerCategory = profile?.payerCategory || "payer"
   return `${customer.accountName} is ranked #${customer.queueRank} based on ${customer.agingDays} overdue days, ${formatCurrency(
     customer.outstanding
-  )} outstanding, and ${payerCategory.toLowerCase()} risk signals.`
+  )} outstanding, ${customer.amountTier} amount tier, and ${payerCategory.toLowerCase()} risk signals. Strategy: ${customer.reminderStrategy}.`
 }
 
 function toCustomerAccount(customer: QueueCustomer, profile?: RiskProfile): CustomerAccount {
-  console.log("RAW CUSTOMER", customer)
   const modifier = getModifier(customer)
   const riskLevel = profile?.riskLabel || customer.riskLabel
 
@@ -135,6 +147,23 @@ function toCustomerAccount(customer: QueueCustomer, profile?: RiskProfile): Cust
     bucket: customer.agingBucket,
     outstanding: customer.outstanding,
     riskLevel,
+    amountTier: customer.amountTier,
+    reminderStrategy: customer.reminderStrategy,
+    reminderStyle: customer.reminderStyle,
+    maxReminders: customer.maxReminders,
+    remindersSent: customer.remindersSent,
+    reminderLimitReached: customer.reminderLimitReached,
+    escalationThresholdDays: customer.escalationThresholdDays,
+    escalationRequired: customer.escalationRequired,
+    managerInvolvement: customer.managerInvolvement,
+    cfoNotificationRequired: customer.cfoNotificationRequired,
+    vipQueueEligible: customer.vipQueueEligible,
+    automatedChannels: customer.automatedChannels,
+    allowedChannels: customer.allowedChannels,
+    playbookSteps: customer.playbookSteps,
+    nextAction: customer.nextAction,
+    manualFollowUpRequired: customer.manualFollowUpRequired,
+    reminderReason: customer.reminderReason,
 
     // ✅ Backend-driven modifier
     modifierType: modifier.type,
@@ -142,7 +171,7 @@ function toCustomerAccount(customer: QueueCustomer, profile?: RiskProfile): Cust
     modifierValue: modifier.value,
 
     statusLabel: getStatusLabel(customer, profile),
-    reminderCount: 0,
+    reminderCount: customer.remindersSent,
     lastAction: getLastAction(customer),
     lastChannel: customer.nextReminderChannel || customer.recommendedChannel,
     responseHistory: [],
@@ -154,7 +183,7 @@ function toCustomerAccount(customer: QueueCustomer, profile?: RiskProfile): Cust
       outstanding: customer.outstanding,
       accountRef: customer.invoiceId,
       agingDays: customer.agingDays,
-      modifierValue: modifier.value,
+      modifierValue: modifier.value || "No pricing adjustment is currently applied",
     }),
 
     creditsUsed: 0,
@@ -196,6 +225,21 @@ function toTriageItem(result: TriageResult, customer?: CustomerAccount): TriageI
     actionTaken: JSON.stringify(result.triageAction),
     followUp: result.summary,
   }
+}
+
+function upsertTask(tasks: TaskItem[], task: TaskItem) {
+  const exists = tasks.some((item) => item.id === task.id)
+  return exists
+    ? tasks.map((item) => (item.id === task.id ? task : item))
+    : [task, ...tasks]
+}
+
+function mergeTasks(current: TaskItem[], incoming: TaskItem[]) {
+  return incoming.reduce((next, task) => upsertTask(next, task), current)
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
 }
 
 export function DashboardStoreProvider({ children }: { children: ReactNode }) {
@@ -266,6 +310,22 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
     ]
   }, [customers, tasks.length])
 
+  const amountBreakdown = useMemo<AmountTierBreakdownItem[]>(() => {
+    const totalOutstanding = customers.reduce((sum, customer) => sum + customer.outstanding, 0)
+
+    return amountTierLabels.map((label) => {
+      const tierCustomers = customers.filter((customer) => (customer.amountTier || amountTierFromOutstanding(customer.outstanding)) === label)
+      const tierOutstanding = tierCustomers.reduce((sum, customer) => sum + customer.outstanding, 0)
+
+      return {
+        label,
+        value: formatCurrency(tierOutstanding),
+        percentage: totalOutstanding ? Math.round((tierOutstanding / totalOutstanding) * 100) : 0,
+        count: tierCustomers.length,
+      }
+    })
+  }, [customers])
+
   const createTask = () => {
     toast.info("Manual task creation is not available on the live backend")
   }
@@ -294,6 +354,7 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
               ? {
                   ...c,
                   reminderCount: c.reminderCount + 1,
+                  remindersSent: (c.remindersSent || c.reminderCount) + 1,
                   lastAction: "Reminder sent just now",
                   lastChannel: result.channelUsed,
                   draftMessage: message,
@@ -303,40 +364,85 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
         )
 
         toast.success(`${result.channelUsed} reminder sent`)
-      } catch {
-        toast.error("Failed to send reminder")
+      } catch (error) {
+        toast.error(errorMessage(error, "Failed to send reminder"))
       }
     })()
   }
 
-  const regenerateDraft = (customerId: string) => {
+  const regenerateDraft = useCallback(async (customerId: string) => {
     const currentDraft = customers.find((c) => c.id === customerId)?.draftMessage || ""
 
-    void (async () => {
-      try {
-        const reminder = await generateReminder(customerId)
+    try {
+      const reminder = await generateReminder(customerId)
 
-        setCustomers((current) =>
-          current.map((c) =>
-            c.id === customerId
-              ? { ...c, draftMessage: reminder.message, lastChannel: reminder.channel }
-              : c
-          )
+      setCustomers((current) =>
+        current.map((c) =>
+          c.id === customerId
+            ? { ...c, draftMessage: reminder.message, lastChannel: reminder.channel }
+            : c
         )
+      )
 
-        toast.success("Draft regenerated")
-      } catch {
-        toast.error("Failed to regenerate draft")
+      toast.success("Draft regenerated")
+      return reminder.message
+    } catch (error) {
+      toast.error(errorMessage(error, "Failed to regenerate draft"))
+      return currentDraft
+    }
+  }, [customers])
+
+  const updateTaskStatus = useCallback(async (taskId: string, status: TaskStatus) => {
+    try {
+      const task = await updateTask(taskId, status)
+      setTasks((current) => upsertTask(current, task))
+      toast.success(`Task moved to ${status}`)
+    } catch (error) {
+      toast.error(errorMessage(error, "Failed to update task"))
+    }
+  }, [])
+
+  const closeTask = useCallback(async (taskId: string, outcome: CloseOutcome) => {
+    const outcomeNotes: Record<CloseOutcome, string> = {
+      Yes: "Payment received; task closed.",
+      No: "Closed without payment confirmation.",
+      Partial: "Partial payment received; task closed for finance review.",
+    }
+
+    try {
+      const task = await updateTask(taskId, "Closed", outcomeNotes[outcome])
+      setTasks((current) => upsertTask(current, task))
+      toast.success("Task closed")
+    } catch (error) {
+      toast.error(errorMessage(error, "Failed to close task"))
+    }
+  }, [])
+
+  const submitTriage = useCallback(async (invoiceId: string, responseText: string) => {
+    setIsTriageLoading(true)
+    try {
+      const result = await submitTriageRequest(invoiceId, responseText)
+      const customer = customers.find((item) => item.id === invoiceId)
+      setTriageItems((current) => [toTriageItem(result, customer), ...current])
+
+      if (result.taskCreated) {
+        const openTasks = await fetchTasks()
+        setTasks((current) => mergeTasks(current, openTasks))
       }
-    })()
 
-    return currentDraft
-  }
+      toast.success("Response triaged")
+    } catch (error) {
+      toast.error(errorMessage(error, "Failed to triage response"))
+    } finally {
+      setIsTriageLoading(false)
+    }
+  }, [customers])
 
   return (
     <DashboardStoreContext.Provider
       value={{
         queueStats,
+        amountBreakdown,
         customers,
         triageItems,
         tasks,
@@ -346,9 +452,9 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
         sendReminder,
         regenerateDraft,
         createTask,
-        updateTaskStatus: async () => {},
-        closeTask: async () => {},
-        submitTriage: async () => {},
+        updateTaskStatus,
+        closeTask,
+        submitTriage,
         loadInteractions,
       }}
     >

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { CreditsIndicator } from "@/components/reminders/CreditsIndicator"
 import { TrackFeed } from "@/components/reminders/TrackFeed"
@@ -16,17 +16,15 @@ export function ComposerPanel({
 }: {
   customer: CustomerAccount
   onSend: (channel: Channel, message: string) => void
-  onRegenerate: () => string
+  onRegenerate: () => Promise<string>
 }) {
-  const [channel, setChannel] = useState<Channel>("Email")
+  const [channel, setChannel] = useState<Channel>(customer.automatedChannels?.[0] || "Email")
   const [message, setMessage] = useState(customer.draftMessage)
   const [activeTab, setActiveTab] = useState<"composer" | "feed">("composer")
-
-  useEffect(() => {
-    setChannel("Email")
-    setMessage(customer.draftMessage)
-    setActiveTab("composer")
-  }, [customer])
+  const availableChannels = customer.automatedChannels?.length ? customer.automatedChannels : channels
+  const requiresManualStep = Boolean(
+    customer.escalationRequired || customer.reminderLimitReached || customer.manualFollowUpRequired
+  )
 
   return (
     <div className="rounded-2xl bg-white p-5 card-shadow flex flex-col">
@@ -43,6 +41,14 @@ export function ComposerPanel({
         <span className="rounded-full bg-[#FEE2E2] px-3 py-1.5 text-xs font-medium text-[#991B1B]">
           {customer.riskLevel}
         </span>
+        <span className="rounded-full bg-[#111827] px-3 py-1.5 text-xs font-medium text-white">
+          {customer.amountTier || "Tier pending"}
+        </span>
+        {customer.cfoNotificationRequired ? (
+          <span className="rounded-full bg-[#FEF2F2] px-3 py-1.5 text-xs font-semibold text-[#B91C1C]">
+            CFO review
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-5 flex flex-col">
@@ -78,8 +84,35 @@ export function ComposerPanel({
         <div className="mt-5">
           {activeTab === "composer" && (
             <>
+              <div className="mb-4 rounded-2xl bg-[#F8FAFC] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[#111827]">
+                      {customer.reminderStrategy || "Standard follow-up"}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[#6B7280]">
+                      {customer.remindersSent || 0}/{customer.maxReminders || 0} touches used.
+                      Escalates at {customer.escalationThresholdDays || "configured"} days.
+                    </p>
+                  </div>
+                  {customer.managerInvolvement ? (
+                    <span className="rounded-full bg-[#FFF7ED] px-3 py-1 text-xs font-semibold text-[#C2410C]">
+                      Manager involved
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-3 text-xs leading-5 text-[#111827]">
+                  Next step: {customer.nextAction || "Send the recommended reminder"}
+                </p>
+                {requiresManualStep ? (
+                  <p className="mt-2 rounded-xl bg-[#FEF2F2] px-3 py-2 text-xs font-medium leading-5 text-[#B91C1C]">
+                    {customer.reminderReason || "This playbook step requires manual finance approval before sending."}
+                  </p>
+                ) : null}
+              </div>
+
               <div className="flex flex-wrap gap-2">
-                {channels.map((option) => (
+                {availableChannels.map((option) => (
                   <button
                     key={option}
                     type="button"
@@ -111,9 +144,10 @@ export function ComposerPanel({
 
               <Button
                 className="mt-5 h-11 w-full rounded-full bg-[#7C3AED] text-sm font-medium text-white hover:bg-[#6D28D9]"
+                disabled={requiresManualStep}
                 onClick={() => onSend(channel, message)}
               >
-                Send
+                {requiresManualStep ? "Manual approval required" : "Send"}
               </Button>
 
               <div className="mt-4 flex items-center justify-between gap-3">
@@ -121,7 +155,12 @@ export function ComposerPanel({
                 <Button
                   variant="link"
                   className="h-auto p-0 text-xs font-medium text-[#7C3AED]"
-                  onClick={() => setMessage(onRegenerate())}
+                  disabled={requiresManualStep}
+                  onClick={() => {
+                    void (async () => {
+                      setMessage(await onRegenerate())
+                    })()
+                  }}
                 >
                   Regenerate
                 </Button>

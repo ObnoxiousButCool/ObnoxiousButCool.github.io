@@ -36,6 +36,13 @@ const riskStyles = {
   Normal: "bg-[#DBEAFE] text-[#1E40AF]",
 } as const
 
+const amountTierStyles = {
+  "<₹10K": "bg-[#ECFDF5] text-[#047857]",
+  "₹10K–₹50K": "bg-[#EFF6FF] text-[#1D4ED8]",
+  "₹50K–₹1L": "bg-[#FFF7ED] text-[#C2410C]",
+  ">₹1L": "bg-[#FEF2F2] text-[#B91C1C]",
+} as const
+
 const modifierStyles = {
   Penalty: "bg-[#FEF3C7] text-[#92400E]",
   Incentive: "bg-[#D1FAE5] text-[#065F46]",
@@ -83,6 +90,18 @@ export function DefaulterQueueTable({
           <div>
             <p className="text-sm font-medium text-[#111827]">{row.original.customerName}</p>
             <p className="mt-1 text-xs text-[#9CA3AF]">{row.original.accountRef}</p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {row.original.vipQueueEligible ? (
+                <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-semibold text-[#B91C1C]">
+                  VIP
+                </span>
+              ) : null}
+              {row.original.cfoNotificationRequired ? (
+                <span className="rounded-full bg-[#111827] px-2 py-0.5 text-[10px] font-semibold text-white">
+                  CFO
+                </span>
+              ) : null}
+            </div>
           </div>
         ),
       },
@@ -90,6 +109,20 @@ export function DefaulterQueueTable({
         accessorKey: "outstanding",
         header: "Outstanding",
         cell: ({ row }) => <span>{formatCurrency(row.original.outstanding)}</span>,
+      },
+      {
+        accessorKey: "amountTier",
+        header: "Amount Tier",
+        cell: ({ row }) => (
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[11px] font-medium",
+              amountTierStyles[row.original.amountTier || "<₹10K"]
+            )}
+          >
+            {row.original.amountTier || "<₹10K"}
+          </span>
+        ),
       },
       {
         accessorKey: "agingDays",
@@ -117,24 +150,34 @@ export function DefaulterQueueTable({
       {
         accessorKey: "modifierLabel",
         header: "Modifier",
-        cell: ({ row }) => (
-          <div>
-            <span
-              className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", modifierStyles[row.original.modifierType])}
-            >
-              {row.original.modifierLabel}
-            </span>
-            <p className="mt-1 text-xs text-[#9CA3AF]">{row.original.modifierValue}</p>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const modifierType = row.original.modifierType
+
+          return (
+            <div>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[11px] font-medium",
+                  modifierType ? modifierStyles[modifierType] : "bg-[#F3F4F6] text-[#6B7280]"
+                )}
+              >
+                {row.original.modifierLabel || "No adjustment"}
+              </span>
+              <p className="mt-1 text-xs text-[#9CA3AF]">{row.original.modifierValue}</p>
+            </div>
+          )
+        },
       },
       {
         accessorKey: "lastAction",
-        header: "Last Action",
+        header: "Strategy / Next",
         cell: ({ row }) => (
           <div>
-            <p className="text-sm text-[#111827]">{row.original.lastAction}</p>
-            <p className="mt-1 text-xs text-[#9CA3AF]">{row.original.lastChannel}</p>
+            <p className="text-sm font-medium text-[#111827]">{row.original.reminderStrategy || "Standard follow-up"}</p>
+            <p className="mt-1 text-xs text-[#6B7280]">{row.original.nextAction || row.original.lastAction}</p>
+            <p className="mt-1 text-xs text-[#9CA3AF]">
+              Next: {row.original.nextReminderChannel || row.original.lastChannel}
+            </p>
           </div>
         ),
       },

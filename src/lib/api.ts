@@ -1,5 +1,6 @@
 import type {
   AgingBucketType,
+  AmountTier,
   Channel,
   InteractionLog,
   RiskLevel,
@@ -18,9 +19,29 @@ interface QueueApiResponse {
   aging_bucket: string
   aging_days: number
   outstanding: number
+  amount_tier: string
+  incentive_amount: number
+  penalty_amount: number
   net_payable: number
+  financial_note: string
   risk_label: string
   recommended_channel: string
+  reminder_strategy: string
+  reminder_style: string
+  max_reminders: number
+  reminders_sent: number
+  reminder_limit_reached: boolean
+  escalation_threshold_days: number
+  escalation_required: boolean
+  manager_involvement: boolean
+  cfo_notification_required: boolean
+  vip_queue_eligible: boolean
+  automated_channels: string[]
+  allowed_channels: string[]
+  playbook_steps: string[]
+  next_action: string
+  manual_follow_up_required: boolean
+  reminder_reason: string
   reminder_send_today: boolean
   next_reminder_channel: string
 }
@@ -82,11 +103,31 @@ export interface QueueCustomer {
   agingBucket: AgingBucketType
   agingDays: number
   outstanding: number
+  amountTier: AmountTier
+  incentiveAmount: number
+  penaltyAmount: number
+  financialNote: string
   netPayable: number
   riskLabel: RiskLevel
-  recommendedChannel: Channel
+  recommendedChannel: string
+  reminderStrategy: string
+  reminderStyle: string
+  maxReminders: number
+  remindersSent: number
+  reminderLimitReached: boolean
+  escalationThresholdDays: number
+  escalationRequired: boolean
+  managerInvolvement: boolean
+  cfoNotificationRequired: boolean
+  vipQueueEligible: boolean
+  automatedChannels: Channel[]
+  allowedChannels: string[]
+  playbookSteps: string[]
+  nextAction: string
+  manualFollowUpRequired: boolean
+  reminderReason: string
   reminderSendToday: boolean
-  nextReminderChannel: Channel
+  nextReminderChannel: string
 }
 
 export interface RiskProfile {
@@ -104,7 +145,7 @@ export interface RiskProfile {
 export interface ReminderDraft {
   invoiceId: string
   channel: Channel               // channel the message was generated for (user's choice)
-  aiRecommendedChannel: Channel  // ← new: AI's suggestion, shown as badge in UI
+  aiRecommendedChannel: string
   message: string
 }
 
@@ -141,13 +182,20 @@ function normalizeAgingBucket(value: string): AgingBucketType {
 
 function normalizeRiskLevel(value: string): RiskLevel {
   const normalized = value.trim().toLowerCase()
-  if (normalized.includes("high")) {
+  if (normalized.includes("high") || normalized.includes("default")) {
     return "High Risk"
   }
-  if (normalized.includes("watch")) {
+  if (normalized.includes("watch") || normalized.includes("chronic") || normalized.includes("partial")) {
     return "Watch"
   }
   return "Normal"
+}
+
+function normalizeAmountTier(value: string): AmountTier {
+  if (value.includes(">") && value.includes("1L")) return ">₹1L"
+  if (value.includes("50K") && value.includes("1L")) return "₹50K–₹1L"
+  if (value.includes("10K")) return "₹10K–₹50K"
+  return "<₹10K"
 }
 
 function normalizeChannel(value: string): Channel {
@@ -159,6 +207,10 @@ function normalizeChannel(value: string): Channel {
     return "WhatsApp"
   }
   return "Email"
+}
+
+function normalizeChannelList(values: string[] | undefined): Channel[] {
+  return (values || []).map(normalizeChannel).filter((value, index, all) => all.indexOf(value) === index)
 }
 
 function normalizeTaskStatus(value: string): TaskStatus {
@@ -180,14 +232,31 @@ function mapQueueItem(item: QueueApiResponse): QueueCustomer {
     agingBucket: normalizeAgingBucket(item.aging_bucket),
     agingDays: item.aging_days,
     outstanding: item.outstanding,
+    amountTier: normalizeAmountTier(item.amount_tier),
     penaltyAmount: item.penalty_amount,
     incentiveAmount: item.incentive_amount,
     financialNote: item.financial_note,
     netPayable: item.net_payable,
     riskLabel: normalizeRiskLevel(item.risk_label),
-    recommendedChannel: normalizeChannel(item.recommended_channel),
+    recommendedChannel: item.recommended_channel,
+    reminderStrategy: item.reminder_strategy,
+    reminderStyle: item.reminder_style,
+    maxReminders: item.max_reminders,
+    remindersSent: item.reminders_sent,
+    reminderLimitReached: item.reminder_limit_reached,
+    escalationThresholdDays: item.escalation_threshold_days,
+    escalationRequired: item.escalation_required,
+    managerInvolvement: item.manager_involvement,
+    cfoNotificationRequired: item.cfo_notification_required,
+    vipQueueEligible: item.vip_queue_eligible,
+    automatedChannels: normalizeChannelList(item.automated_channels),
+    allowedChannels: item.allowed_channels || [],
+    playbookSteps: item.playbook_steps || [],
+    nextAction: item.next_action,
+    manualFollowUpRequired: item.manual_follow_up_required,
+    reminderReason: item.reminder_reason,
     reminderSendToday: item.reminder_send_today,
-    nextReminderChannel: normalizeChannel(item.next_reminder_channel),
+    nextReminderChannel: item.next_reminder_channel,
   }
 }
 
@@ -231,7 +300,7 @@ function mapReminder(item: ReminderApiResponse): ReminderDraft {
   return {
     invoiceId: item.invoice_id,
     channel: normalizeChannel(item.channel),
-    aiRecommendedChannel: normalizeChannel(item.ai_recommended_channel),
+    aiRecommendedChannel: item.ai_recommended_channel,
     message: item.message,
   }
 }
@@ -260,9 +329,9 @@ function mapDispatchResult(item: DispatchApiResponse): DispatchResult {
 
 function mapInteraction(item: Record<string, unknown>, index: number): InteractionLog {
   const fallbackId = `interaction-${index}-${String(item.invoice_id ?? item.id ?? "entry")}`
-  const timestamp = String(item.timestamp ?? item.created_at ?? item.date ?? item.logged_at ?? "Unknown")
-  const description = String(item.message ?? item.description ?? item.summary ?? item.note ?? "Activity logged")
-  const eventType = String(item.type ?? item.event_type ?? item.channel ?? item.status ?? "Flag Updated")
+  const timestamp = String(item.timestamp ?? item.created_date ?? item.created_at ?? item.date ?? item.logged_at ?? "Unknown")
+  const description = String(item.content ?? item.message ?? item.description ?? item.summary ?? item.note ?? "Activity logged")
+  const eventType = String(item.interaction_type ?? item.type ?? item.event_type ?? item.channel ?? item.status ?? "Flag Updated")
 
   return {
     id: String(item.id ?? fallbackId),

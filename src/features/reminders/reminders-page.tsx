@@ -12,16 +12,17 @@ export function RemindersPage() {
 
   const selectedCustomer =
     customers.find((customer) => customer.id === searchParams.get("customer")) ?? customers[0]
+  const selectedCustomerId = selectedCustomer?.id
 
   const orderedCustomers = useMemo(() => customers, [customers])
 
   useEffect(() => {
-    if (!selectedCustomer) {
+    if (!selectedCustomerId) {
       return
     }
 
-    void loadInteractions(selectedCustomer.id)
-  }, [selectedCustomer?.id])
+    void loadInteractions(selectedCustomerId)
+  }, [loadInteractions, selectedCustomerId])
 
   if (!selectedCustomer) {
     return (
@@ -42,6 +43,7 @@ export function RemindersPage() {
       />
 
       <ComposerPanel
+        key={selectedCustomer.id}
         customer={selectedCustomer}
         onRegenerate={() => regenerateDraft(selectedCustomer.id)}
         onSend={(channel, message) => sendReminder(selectedCustomer.id, channel, message)}
