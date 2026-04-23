@@ -9,7 +9,8 @@ const pageMeta: Record<string, { title: string; action?: string }> = {
   "/queue": { title: "Queue", action: "AI Summary ↗" },
   "/reminders": { title: "Reminders" },
   "/tasks": { title: "Tasks" },
-  "/insights": { title: "Insights" },
+  "/cfo": { title: "CFO View" },
+  "/insights": { title: "DSO Analytics" },
 }
 
 export function AppShell() {

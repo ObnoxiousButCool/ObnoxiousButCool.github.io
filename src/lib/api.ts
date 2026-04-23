@@ -1,7 +1,20 @@
 import type {
   AgingBucketType,
   AmountTier,
+  CfoApprovalResult,
+  CfoConfidenceBucket,
+  CfoForecast,
+  CfoForecastBucket,
+  CfoForecastWindow,
+  CfoIncentiveApproval,
+  CfoInvoicePrediction,
+  CfoPayerPrediction,
+  CfoScenario,
   Channel,
+  DsoAnalytics,
+  DsoBottleneckStage,
+  DsoProcessMetric,
+  DsoRecommendation,
   InteractionLog,
   RiskLevel,
   TaskItem,
@@ -94,6 +107,129 @@ interface DispatchApiResponse {
   fallback_used: boolean
   attempted_channels: string[]
   message_sid: string | null
+}
+
+interface CfoForecastBucketApiResponse {
+  amount: number
+  weighted_amount: number
+  count: number
+}
+
+interface CfoForecastWindowApiResponse {
+  days: number
+  window_end: string
+  weighted_total: number
+  buckets: Record<string, CfoForecastBucketApiResponse>
+}
+
+interface CfoScenarioApiResponse {
+  days: number
+  best_case: number
+  expected: number
+  worst_case: number
+}
+
+interface CfoPayerPredictionApiResponse {
+  account_name: string
+  outstanding: number
+  payment_probability: number
+  historical_avg_days_to_pay: number
+  expected_date: string
+  summary: string
+}
+
+interface CfoIncentiveApprovalApiResponse {
+  invoice_id: string
+  account_name: string
+  outstanding: number
+  payment_probability: number
+  discount_percent: number
+  incentive_amount: number
+  status: string
+  approved_by: string | null
+  approved_at: string | null
+  recommendation: string
+}
+
+interface CfoInvoicePredictionApiResponse {
+  invoice_id: string
+  account_name: string
+  payer_category: string
+  outstanding: number
+  aging_days: number
+  payment_probability: number
+  confidence_bucket: string
+  expected_date: string
+  historical_avg_days_to_pay: number
+  weighted_amount: number
+  latest_response_classification: string
+  reminders_sent: number
+}
+
+interface CfoForecastApiResponse {
+  as_of: string
+  forecasts: {
+    next_7_days: CfoForecastWindowApiResponse
+    next_30_days: CfoForecastWindowApiResponse
+  }
+  payer_predictions: CfoPayerPredictionApiResponse[]
+  scenarios: {
+    next_7_days: CfoScenarioApiResponse
+    next_30_days: CfoScenarioApiResponse
+  }
+  incentive_approvals: CfoIncentiveApprovalApiResponse[]
+  predictions: CfoInvoicePredictionApiResponse[]
+}
+
+interface CfoApprovalApiResponse {
+  invoice_id: string
+  account_name: string
+  discount_percent: number
+  incentive_amount: number
+  status: string
+  approved_by: string
+  approved_at: string
+}
+
+interface DsoBottleneckStageApiResponse {
+  key: string
+  stage: string
+  average_days: number
+  impact_level: "High" | "Medium" | "Low"
+  description: string
+}
+
+interface DsoRecommendationApiResponse {
+  target_stage: string
+  current_days: number
+  reduction_days: number
+  projected_dso: number
+  faster_cash_flow: number
+  narrative: string
+}
+
+interface DsoProcessMetricApiResponse {
+  transition: string
+  average_days: number
+  observed_count: number
+  benchmark_days: number
+  source: "Observed" | "Modeled"
+  status: "On Track" | "Needs Attention"
+}
+
+interface DsoAnalyticsApiResponse {
+  as_of: string
+  current_dso: number
+  last_month_dso: number
+  trend_days: number
+  trend_direction: "Up" | "Down" | "Flat"
+  total_accounts_receivable: number
+  average_daily_sales: number
+  trailing_sales: number
+  bottleneck_stages: DsoBottleneckStageApiResponse[]
+  ai_recommendation: DsoRecommendationApiResponse
+  process_efficiency: DsoProcessMetricApiResponse[]
+  data_notes: string[]
 }
 
 export interface QueueCustomer {
@@ -327,6 +463,168 @@ function mapDispatchResult(item: DispatchApiResponse): DispatchResult {
   }
 }
 
+function normalizeConfidenceBucket(value: string): CfoConfidenceBucket {
+  if (value === "High Confidence" || value === "Medium Confidence" || value === "Low Confidence") {
+    return value
+  }
+  return "Low Confidence"
+}
+
+function mapCfoForecastBucket(item: CfoForecastBucketApiResponse | undefined): CfoForecastBucket {
+  return {
+    amount: item?.amount ?? 0,
+    weightedAmount: item?.weighted_amount ?? 0,
+    count: item?.count ?? 0,
+  }
+}
+
+function mapCfoForecastWindow(item: CfoForecastWindowApiResponse): CfoForecastWindow {
+  const bucketNames: CfoConfidenceBucket[] = ["High Confidence", "Medium Confidence", "Low Confidence"]
+
+  return {
+    days: item.days,
+    windowEnd: item.window_end,
+    weightedTotal: item.weighted_total,
+    buckets: bucketNames.reduce(
+      (current, bucketName) => ({
+        ...current,
+        [bucketName]: mapCfoForecastBucket(item.buckets[bucketName]),
+      }),
+      {} as Record<CfoConfidenceBucket, CfoForecastBucket>
+    ),
+  }
+}
+
+function mapCfoScenario(item: CfoScenarioApiResponse): CfoScenario {
+  return {
+    days: item.days,
+    bestCase: item.best_case,
+    expected: item.expected,
+    worstCase: item.worst_case,
+  }
+}
+
+function mapCfoPayerPrediction(item: CfoPayerPredictionApiResponse): CfoPayerPrediction {
+  return {
+    accountName: item.account_name,
+    outstanding: item.outstanding,
+    paymentProbability: item.payment_probability,
+    historicalAvgDaysToPay: item.historical_avg_days_to_pay,
+    expectedDate: item.expected_date,
+    summary: item.summary,
+  }
+}
+
+function mapCfoIncentiveApproval(item: CfoIncentiveApprovalApiResponse): CfoIncentiveApproval {
+  return {
+    invoiceId: item.invoice_id,
+    accountName: item.account_name,
+    outstanding: item.outstanding,
+    paymentProbability: item.payment_probability,
+    discountPercent: item.discount_percent,
+    incentiveAmount: item.incentive_amount,
+    status: item.status,
+    approvedBy: item.approved_by,
+    approvedAt: item.approved_at,
+    recommendation: item.recommendation,
+  }
+}
+
+function mapCfoInvoicePrediction(item: CfoInvoicePredictionApiResponse): CfoInvoicePrediction {
+  return {
+    invoiceId: item.invoice_id,
+    accountName: item.account_name,
+    payerCategory: item.payer_category,
+    outstanding: item.outstanding,
+    agingDays: item.aging_days,
+    paymentProbability: item.payment_probability,
+    confidenceBucket: normalizeConfidenceBucket(item.confidence_bucket),
+    expectedDate: item.expected_date,
+    historicalAvgDaysToPay: item.historical_avg_days_to_pay,
+    weightedAmount: item.weighted_amount,
+    latestResponseClassification: item.latest_response_classification,
+    remindersSent: item.reminders_sent,
+  }
+}
+
+function mapCfoForecast(item: CfoForecastApiResponse): CfoForecast {
+  return {
+    asOf: item.as_of,
+    forecasts: {
+      next7Days: mapCfoForecastWindow(item.forecasts.next_7_days),
+      next30Days: mapCfoForecastWindow(item.forecasts.next_30_days),
+    },
+    payerPredictions: item.payer_predictions.map(mapCfoPayerPrediction),
+    scenarios: {
+      next7Days: mapCfoScenario(item.scenarios.next_7_days),
+      next30Days: mapCfoScenario(item.scenarios.next_30_days),
+    },
+    incentiveApprovals: item.incentive_approvals.map(mapCfoIncentiveApproval),
+    predictions: item.predictions.map(mapCfoInvoicePrediction),
+  }
+}
+
+function mapCfoApprovalResult(item: CfoApprovalApiResponse): CfoApprovalResult {
+  return {
+    invoiceId: item.invoice_id,
+    accountName: item.account_name,
+    discountPercent: item.discount_percent,
+    incentiveAmount: item.incentive_amount,
+    status: item.status,
+    approvedBy: item.approved_by,
+    approvedAt: item.approved_at,
+  }
+}
+
+function mapDsoBottleneckStage(item: DsoBottleneckStageApiResponse): DsoBottleneckStage {
+  return {
+    key: item.key,
+    stage: item.stage,
+    averageDays: item.average_days,
+    impactLevel: item.impact_level,
+    description: item.description,
+  }
+}
+
+function mapDsoRecommendation(item: DsoRecommendationApiResponse): DsoRecommendation {
+  return {
+    targetStage: item.target_stage,
+    currentDays: item.current_days,
+    reductionDays: item.reduction_days,
+    projectedDso: item.projected_dso,
+    fasterCashFlow: item.faster_cash_flow,
+    narrative: item.narrative,
+  }
+}
+
+function mapDsoProcessMetric(item: DsoProcessMetricApiResponse): DsoProcessMetric {
+  return {
+    transition: item.transition,
+    averageDays: item.average_days,
+    observedCount: item.observed_count,
+    benchmarkDays: item.benchmark_days,
+    source: item.source,
+    status: item.status,
+  }
+}
+
+function mapDsoAnalytics(item: DsoAnalyticsApiResponse): DsoAnalytics {
+  return {
+    asOf: item.as_of,
+    currentDso: item.current_dso,
+    lastMonthDso: item.last_month_dso,
+    trendDays: item.trend_days,
+    trendDirection: item.trend_direction,
+    totalAccountsReceivable: item.total_accounts_receivable,
+    averageDailySales: item.average_daily_sales,
+    trailingSales: item.trailing_sales,
+    bottleneckStages: item.bottleneck_stages.map(mapDsoBottleneckStage),
+    aiRecommendation: mapDsoRecommendation(item.ai_recommendation),
+    processEfficiency: item.process_efficiency.map(mapDsoProcessMetric),
+    dataNotes: item.data_notes,
+  }
+}
+
 function mapInteraction(item: Record<string, unknown>, index: number): InteractionLog {
   const fallbackId = `interaction-${index}-${String(item.invoice_id ?? item.id ?? "entry")}`
   const timestamp = String(item.timestamp ?? item.created_date ?? item.created_at ?? item.date ?? item.logged_at ?? "Unknown")
@@ -383,6 +681,28 @@ export async function fetchQueue() {
 export async function fetchProfiles() {
   const data = await apiFetch<ProfileApiResponse[]>("/api/profiles")
   return data.map(mapProfile)
+}
+
+export async function fetchCfoForecast() {
+  const data = await apiFetch<CfoForecastApiResponse>("/api/cfo/forecast")
+  return mapCfoForecast(data)
+}
+
+export async function approveCfoIncentive(invoiceId: string, approvedBy = "CFO") {
+  const data = await apiFetch<CfoApprovalApiResponse>(
+    `/api/cfo/incentives/${encodeURIComponent(invoiceId)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({ approved_by: approvedBy }),
+    }
+  )
+
+  return mapCfoApprovalResult(data)
+}
+
+export async function fetchDsoAnalytics() {
+  const data = await apiFetch<DsoAnalyticsApiResponse>("/api/dso/analytics")
+  return mapDsoAnalytics(data)
 }
 
 export async function fetchTasks() {

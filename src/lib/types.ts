@@ -117,6 +117,131 @@ export interface AmountTierBreakdownItem {
   count: number
 }
 
+export type CfoConfidenceBucket = "High Confidence" | "Medium Confidence" | "Low Confidence"
+
+export interface CfoForecastBucket {
+  amount: number
+  weightedAmount: number
+  count: number
+}
+
+export interface CfoForecastWindow {
+  days: number
+  windowEnd: string
+  weightedTotal: number
+  buckets: Record<CfoConfidenceBucket, CfoForecastBucket>
+}
+
+export interface CfoScenario {
+  days: number
+  bestCase: number
+  expected: number
+  worstCase: number
+}
+
+export interface CfoPayerPrediction {
+  accountName: string
+  outstanding: number
+  paymentProbability: number
+  historicalAvgDaysToPay: number
+  expectedDate: string
+  summary: string
+}
+
+export interface CfoIncentiveApproval {
+  invoiceId: string
+  accountName: string
+  outstanding: number
+  paymentProbability: number
+  discountPercent: number
+  incentiveAmount: number
+  status: string
+  approvedBy: string | null
+  approvedAt: string | null
+  recommendation: string
+}
+
+export interface CfoInvoicePrediction {
+  invoiceId: string
+  accountName: string
+  payerCategory: string
+  outstanding: number
+  agingDays: number
+  paymentProbability: number
+  confidenceBucket: CfoConfidenceBucket
+  expectedDate: string
+  historicalAvgDaysToPay: number
+  weightedAmount: number
+  latestResponseClassification: string
+  remindersSent: number
+}
+
+export interface CfoForecast {
+  asOf: string
+  forecasts: {
+    next7Days: CfoForecastWindow
+    next30Days: CfoForecastWindow
+  }
+  payerPredictions: CfoPayerPrediction[]
+  scenarios: {
+    next7Days: CfoScenario
+    next30Days: CfoScenario
+  }
+  incentiveApprovals: CfoIncentiveApproval[]
+  predictions: CfoInvoicePrediction[]
+}
+
+export interface CfoApprovalResult {
+  invoiceId: string
+  accountName: string
+  discountPercent: number
+  incentiveAmount: number
+  status: string
+  approvedBy: string
+  approvedAt: string
+}
+
+export interface DsoBottleneckStage {
+  key: string
+  stage: string
+  averageDays: number
+  impactLevel: "High" | "Medium" | "Low"
+  description: string
+}
+
+export interface DsoRecommendation {
+  targetStage: string
+  currentDays: number
+  reductionDays: number
+  projectedDso: number
+  fasterCashFlow: number
+  narrative: string
+}
+
+export interface DsoProcessMetric {
+  transition: string
+  averageDays: number
+  observedCount: number
+  benchmarkDays: number
+  source: "Observed" | "Modeled"
+  status: "On Track" | "Needs Attention"
+}
+
+export interface DsoAnalytics {
+  asOf: string
+  currentDso: number
+  lastMonthDso: number
+  trendDays: number
+  trendDirection: "Up" | "Down" | "Flat"
+  totalAccountsReceivable: number
+  averageDailySales: number
+  trailingSales: number
+  bottleneckStages: DsoBottleneckStage[]
+  aiRecommendation: DsoRecommendation
+  processEfficiency: DsoProcessMetric[]
+  dataNotes: string[]
+}
+
 export interface TriageResult {
   invoiceId: string
   category: string
