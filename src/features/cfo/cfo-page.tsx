@@ -165,7 +165,6 @@ function ApprovalCard({
             "rounded-full px-5",
             approved ? "bg-[#ECFDF5] text-[#047857] hover:bg-[#D1FAE5]" : "bg-[#111827] text-white hover:bg-[#1F2937]"
           )}
-          disabled={approved || approving}
           onClick={() => onApprove(approval.invoiceId)}
         >
           {approved ? "Approved" : approving ? "Approving..." : "Approve"}

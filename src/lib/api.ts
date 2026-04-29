@@ -63,6 +63,9 @@ interface QueueApiResponse {
   reminder_reason: string
   reminder_send_today: boolean
   next_reminder_channel: string
+  incentive_approved: number
+  approved_discount_pct: number
+  approved_discount_amount: number
 }
 
 interface ProfileApiResponse {
@@ -344,6 +347,9 @@ export interface QueueCustomer {
   reminderReason: string
   reminderSendToday: boolean
   nextReminderChannel: string
+  incentiveApproved: number
+  approvedDiscountPct: number
+  approvedDiscountAmount: number
 }
 
 export interface RiskProfile {
@@ -454,7 +460,7 @@ function mapQueueItem(item: QueueApiResponse): QueueCustomer {
     financialNote: item.financial_note,
     netPayable: item.net_payable,
     riskLabel: normalizeRiskLevel(item.risk_label),
-    recommendedChannel: item.recommended_channel,
+    recommendedChannel: normalizeChannel(item.recommended_channel),
     reminderStrategy: item.reminder_strategy,
     reminderStyle: item.reminder_style,
     maxReminders: item.max_reminders,
@@ -473,6 +479,9 @@ function mapQueueItem(item: QueueApiResponse): QueueCustomer {
     reminderReason: item.reminder_reason,
     reminderSendToday: item.reminder_send_today,
     nextReminderChannel: item.next_reminder_channel,
+    incentiveApproved: item.incentive_approved,
+    approvedDiscountPct: item.approved_discount_pct,
+    approvedDiscountAmount: item.approved_discount_amount,
   }
 }
 

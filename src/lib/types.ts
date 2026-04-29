@@ -65,6 +65,9 @@ export interface CustomerAccount {
   recommendedChannel?: string
   reminderSendToday?: boolean
   nextReminderChannel?: string
+  incentiveApproved?: boolean | number
+  approvedDiscountPct?: number
+  approvedDiscountAmount?: number
   riskScore?: number
   payerCategory?: string
   defaulterFlag?: boolean

@@ -42,12 +42,12 @@ interface DashboardStoreValue {
   isQueueLoading: boolean
   isTasksLoading: boolean
   isTriageLoading: boolean
-  sendReminder: (customerId: string, channel: Channel, message: string) => void
-  regenerateDraft: (customerId: string) => Promise<string>
+  sendReminder: (customerId: string, channel: Channel, message: string) => Promise<void>
+  regenerateDraft: (customerId: string, channel?: Channel) => Promise<string>
   createTask: (customerId: string) => void
   updateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>
   closeTask: (taskId: string, outcome: CloseOutcome) => Promise<void>
-  submitTriage: (invoiceId: string, responseText: string) => Promise<void>
+  submitTriage: (invoiceId: string, responseText: string) => Promise<TriageResult>
   loadInteractions: (customerId: string) => Promise<void>
   loadPlaybook: (customerId: string) => Promise<void>
 }
@@ -203,6 +203,9 @@ function toCustomerAccount(
     recommendedChannel: customer.recommendedChannel,
     reminderSendToday: customer.reminderSendToday,
     nextReminderChannel: customer.nextReminderChannel,
+    incentiveApproved: customer.incentiveApproved,
+    approvedDiscountPct: customer.approvedDiscountPct,
+    approvedDiscountAmount: customer.approvedDiscountAmount,
     riskScore: profile?.riskScore,
     payerCategory: profile?.payerCategory,
     defaulterFlag: profile?.defaulterFlag,
@@ -365,38 +368,36 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const sendReminder = (customerId: string, channel: Channel, message: string) => {
-    void (async () => {
-      try {
-        const result = await dispatchReminder(customerId, channel, message)
+  const sendReminder = async (customerId: string, channel: Channel, message: string) => {
+    try {
+      const result = await dispatchReminder(customerId, channel, message)
 
-        setCustomers((current) =>
-          current.map((c) =>
-            c.id === customerId
-              ? {
-                  ...c,
-                  reminderCount: c.reminderCount + 1,
-                  remindersSent: (c.remindersSent || c.reminderCount) + 1,
-                  lastAction: "Reminder sent just now",
-                  lastChannel: result.channelUsed,
-                  draftMessage: message,
-                }
-              : c
-          )
+      setCustomers((current) =>
+        current.map((c) =>
+          c.id === customerId
+            ? {
+                ...c,
+                reminderCount: c.reminderCount + 1,
+                remindersSent: (c.remindersSent || c.reminderCount) + 1,
+                lastAction: "Reminder sent just now",
+                lastChannel: result.channelUsed,
+                draftMessage: message,
+              }
+            : c
         )
+      )
 
-        toast.success(`${result.channelUsed} reminder sent`)
-      } catch (error) {
-        toast.error(errorMessage(error, "Failed to send reminder"))
-      }
-    })()
+      toast.success(`${result.channelUsed} reminder sent`)
+    } catch (error) {
+      toast.error(errorMessage(error, "Failed to send reminder"))
+    }
   }
 
-  const regenerateDraft = useCallback(async (customerId: string) => {
+  const regenerateDraft = useCallback(async (customerId: string, channel?: Channel) => {
     const currentDraft = customers.find((c) => c.id === customerId)?.draftMessage || ""
 
     try {
-      const reminder = await generateReminder(customerId)
+      const reminder = await generateReminder(customerId, channel)
 
       setCustomers((current) =>
         current.map((c) =>
@@ -465,8 +466,10 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
       }
 
       toast.success("Response triaged")
+      return result
     } catch (error) {
       toast.error(errorMessage(error, "Failed to triage response"))
+      throw error
     } finally {
       setIsTriageLoading(false)
     }
