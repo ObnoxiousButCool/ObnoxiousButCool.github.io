@@ -61,7 +61,7 @@ const handleAISummary = async () => {
   setShowSummary(true)
   setSummaryLoading(true)
   try {
-    const response = await fetch("http://localhost:8000/api/ai-summary")
+    const response = await fetch(import.meta.env.VITE_API_BASE_URL + "/api/ai-summary")
     const data = await response.json()
     setSummaryText(data.summary)
   } catch (err) {

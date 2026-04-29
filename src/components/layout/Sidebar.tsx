@@ -1,4 +1,4 @@
-import { Bell, ChevronRight, Lightbulb, LineChart, ListTodo, Sparkles, type LucideIcon } from "lucide-react"
+import { Bell, ChevronRight, FileSpreadsheet, Lightbulb, LineChart, ListTodo, Sparkles, type LucideIcon } from "lucide-react"
 import { NavLink } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,7 @@ const primaryItems: SidebarItem[] = [
   { label: "Reminders", to: "/reminders", icon: Bell, expandable: true },
   { label: "Tasks", to: "/tasks", icon: ListTodo, expandable: true },
   { label: "CFO View", to: "/cfo", icon: LineChart },
+  { label: "Data Mapper", to: "/mapper", icon: FileSpreadsheet },
   { label: "DSO Analytics", to: "/insights", icon: Lightbulb },
 ]
 

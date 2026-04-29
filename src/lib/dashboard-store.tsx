@@ -3,7 +3,9 @@ import { toast } from "sonner"
 import { useCallback } from "react"
 import {
   dispatchReminder,
+  fetchBehavioralScorecards,
   fetchInteractions,
+  fetchInterventionPlaybook,
   fetchProfiles,
   fetchQueue,
   fetchTasks,
@@ -19,6 +21,7 @@ import type {
   CloseOutcome,
   CustomerAccount,
   AmountTierBreakdownItem,
+  BehavioralScorecard,
   InteractionLog,
   QueueStat,
   TaskItem,
@@ -46,6 +49,7 @@ interface DashboardStoreValue {
   closeTask: (taskId: string, outcome: CloseOutcome) => Promise<void>
   submitTriage: (invoiceId: string, responseText: string) => Promise<void>
   loadInteractions: (customerId: string) => Promise<void>
+  loadPlaybook: (customerId: string) => Promise<void>
 }
 
 const DashboardStoreContext = createContext<DashboardStoreValue | null>(null)
@@ -134,7 +138,11 @@ function getAiSummary(customer: QueueCustomer, profile?: RiskProfile) {
   )} outstanding, ${customer.amountTier} amount tier, and ${payerCategory.toLowerCase()} risk signals. Strategy: ${customer.reminderStrategy}.`
 }
 
-function toCustomerAccount(customer: QueueCustomer, profile?: RiskProfile): CustomerAccount {
+function toCustomerAccount(
+  customer: QueueCustomer,
+  profile?: RiskProfile,
+  scorecard?: BehavioralScorecard
+): CustomerAccount {
   const modifier = getModifier(customer)
   const riskLevel = profile?.riskLabel || customer.riskLabel
 
@@ -202,6 +210,7 @@ function toCustomerAccount(customer: QueueCustomer, profile?: RiskProfile): Cust
     partialRate: profile?.partialRate,
     recoveryRate: profile?.recoveryRate,
     avgDaysLate: profile?.avgDaysLate,
+    behavioralScorecard: scorecard,
   }
 }
 
@@ -257,11 +266,24 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
       setIsQueueLoading(true)
 
       try {
-        const [queue, profiles] = await Promise.all([fetchQueue(), fetchProfiles()])
+        const [queue, profiles, scorecards] = await Promise.all([
+          fetchQueue(),
+          fetchProfiles(),
+          fetchBehavioralScorecards(),
+        ])
         if (!isMounted) return
 
         const profilesByAccount = new Map(profiles.map((p) => [p.accountName, p]))
-        setCustomers(queue.map((item) => toCustomerAccount(item, profilesByAccount.get(item.accountName))))
+        const scorecardsByAccount = new Map(scorecards.map((item) => [item.accountName, item]))
+        setCustomers(
+          queue.map((item) =>
+            toCustomerAccount(
+              item,
+              profilesByAccount.get(item.accountName),
+              scorecardsByAccount.get(item.accountName)
+            )
+          )
+        )
       } catch {
         if (isMounted) {
           setCustomers([])
@@ -402,6 +424,18 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const loadPlaybook = useCallback(async (customerId: string) => {
+    try {
+      const interventionPlaybook = await fetchInterventionPlaybook(customerId)
+
+      setCustomers((current) =>
+        current.map((c) => (c.id === customerId ? { ...c, interventionPlaybook } : c))
+      )
+    } catch {
+      toast.error("Failed to load intervention playbook")
+    }
+  }, [])
+
   const closeTask = useCallback(async (taskId: string, outcome: CloseOutcome) => {
     const outcomeNotes: Record<CloseOutcome, string> = {
       Yes: "Payment received; task closed.",
@@ -456,6 +490,7 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
         closeTask,
         submitTriage,
         loadInteractions,
+        loadPlaybook,
       }}
     >
       {children}

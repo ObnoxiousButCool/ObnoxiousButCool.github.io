@@ -206,19 +206,19 @@ export function InsightsPage() {
           <CardHeader className="px-5 pt-5">
             <CardTitle className="flex items-center gap-2 text-[18px] font-semibold">
               <Lightbulb className="h-5 w-5 text-[#FDE68A]" />
-              AI recommendation
+              Recommendation
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5 pb-5">
-            <p className="text-2xl font-bold leading-snug">{analytics.aiRecommendation.narrative}</p>
+            <p className="text-2xl font-bold leading-snug">{analytics.recommendation.narrative}</p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-white/10 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-[#A5B4FC]">Projected DSO</p>
-                <p className="mt-2 text-xl font-semibold">{analytics.aiRecommendation.projectedDso.toFixed(1)} days</p>
+                <p className="mt-2 text-xl font-semibold">{analytics.recommendation.projectedDso.toFixed(1)} days</p>
               </div>
               <div className="rounded-2xl bg-white/10 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-[#A5B4FC]">Faster cash flow</p>
-                <p className="mt-2 text-xl font-semibold">{formatCurrency(analytics.aiRecommendation.fasterCashFlow)}</p>
+                <p className="mt-2 text-xl font-semibold">{formatCurrency(analytics.recommendation.fasterCashFlow)}</p>
               </div>
             </div>
           </CardContent>

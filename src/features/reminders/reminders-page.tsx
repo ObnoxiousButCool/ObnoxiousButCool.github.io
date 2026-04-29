@@ -8,7 +8,7 @@ import { useDashboardStore } from "@/lib/dashboard-store"
 
 export function RemindersPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { customers, triageItems, sendReminder, regenerateDraft, loadInteractions } = useDashboardStore()
+  const { customers, triageItems, sendReminder, regenerateDraft, loadInteractions, loadPlaybook } = useDashboardStore()
 
   const selectedCustomer =
     customers.find((customer) => customer.id === searchParams.get("customer")) ?? customers[0]
@@ -21,8 +21,8 @@ export function RemindersPage() {
       return
     }
 
-    void loadInteractions(selectedCustomerId)
-  }, [loadInteractions, selectedCustomerId])
+    void Promise.all([loadInteractions(selectedCustomerId), loadPlaybook(selectedCustomerId)])
+  }, [loadInteractions, loadPlaybook, selectedCustomerId])
 
   if (!selectedCustomer) {
     return (

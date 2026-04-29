@@ -9,6 +9,14 @@ import { cn } from "@/lib/utils"
 
 const channels: Channel[] = ["Email", "SMS", "WhatsApp"]
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
 export function ComposerPanel({
   customer,
   onSend,
@@ -22,6 +30,8 @@ export function ComposerPanel({
   const [message, setMessage] = useState(customer.draftMessage)
   const [activeTab, setActiveTab] = useState<"composer" | "feed">("composer")
   const availableChannels = customer.automatedChannels?.length ? customer.automatedChannels : channels
+  const scorecard = customer.behavioralScorecard
+  const playbook = customer.interventionPlaybook
   const requiresManualStep = Boolean(
     customer.escalationRequired || customer.reminderLimitReached || customer.manualFollowUpRequired
   )
@@ -110,6 +120,120 @@ export function ComposerPanel({
                   </p>
                 ) : null}
               </div>
+
+              {scorecard ? (
+                <div className="mb-4 rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#111827]">Behavioral scorecard</p>
+                      <p className="mt-1 text-xs text-[#6B7280]">{scorecard.fallbackLayer}</p>
+                    </div>
+                    {scorecard.manualReviewRequired ? (
+                      <span className="rounded-full bg-[#FEF2F2] px-3 py-1 text-xs font-semibold text-[#B91C1C]">
+                        Manual review required
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-2xl bg-[#F8FAFC] p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                        Avg days to pay
+                      </p>
+                      <p className="mt-2 text-lg font-bold text-[#111827]">{scorecard.averageDaysToPay.toFixed(1)}d</p>
+                    </div>
+                    <div className="rounded-2xl bg-[#F8FAFC] p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                        Ignored reminders
+                      </p>
+                      <p className="mt-2 text-lg font-bold text-[#111827]">
+                        {scorecard.ignoredReminders}/{scorecard.observedReminders || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-[#F8FAFC] p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                        Total outstanding
+                      </p>
+                      <p className="mt-2 text-lg font-bold text-[#111827]">
+                        {formatCurrency(scorecard.totalOutstandingBalance)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-[#F8FAFC] p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                        Preferred channel
+                      </p>
+                      <p className="mt-2 text-lg font-bold text-[#111827]">{scorecard.preferredChannel}</p>
+                    </div>
+                    <div className="rounded-2xl bg-[#F8FAFC] p-3 sm:col-span-2 xl:col-span-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                        Best reminder window
+                      </p>
+                      <p className="mt-2 text-lg font-bold text-[#111827]">
+                        {scorecard.bestSendDay}, {scorecard.bestSendTimeWindow}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 text-xs leading-5 text-[#6B7280]">{scorecard.note}</p>
+                </div>
+              ) : null}
+
+              {playbook ? (
+                <div className="mb-4 rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#111827]">AI intervention playbook</p>
+                      <p className="mt-1 text-xs text-[#6B7280]">{playbook.similarCaseBasis}</p>
+                    </div>
+                    <div className="text-right text-xs text-[#6B7280]">
+                      <p>{playbook.sourceMode}</p>
+                      <p>{new Date(playbook.generatedAt).toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-[#ECFDF5] px-3 py-1 font-semibold text-[#047857]">
+                      {playbook.approvalSummary.automatedSteps} automated
+                    </span>
+                    <span className="rounded-full bg-[#FEF2F2] px-3 py-1 font-semibold text-[#B91C1C]">
+                      {playbook.approvalSummary.manualSteps} manual approval
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {playbook.steps.map((step, index) => (
+                      <div key={`${step.action}-${index}`} className="rounded-2xl bg-[#F8FAFC] p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-[#111827]">
+                              Step {index + 1}: {step.action}
+                            </p>
+                            <p className="mt-1 text-xs text-[#6B7280]">
+                              {step.channel} · {step.timing}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full bg-[#EEF2FF] px-3 py-1 text-xs font-semibold text-[#4338CA]">
+                              {Math.round(step.estimatedSuccessProbability * 100)}% success
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded-full px-3 py-1 text-xs font-semibold",
+                                step.requiresApproval
+                                  ? "bg-[#FEF2F2] text-[#B91C1C]"
+                                  : "bg-[#ECFDF5] text-[#047857]"
+                              )}
+                            >
+                              {step.automationLevel}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="mt-3 text-xs leading-5 text-[#6B7280]">{step.rationale}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap gap-2">
                 {availableChannels.map((option) => (

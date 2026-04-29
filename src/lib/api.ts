@@ -1,6 +1,7 @@
 import type {
   AgingBucketType,
   AmountTier,
+  BehavioralScorecard,
   CfoApprovalResult,
   CfoConfidenceBucket,
   CfoForecast,
@@ -16,6 +17,11 @@ import type {
   DsoProcessMetric,
   DsoRecommendation,
   InteractionLog,
+  IngestionConfirmResult,
+  IngestionIssue,
+  IngestionPreview,
+  InterventionPlaybook,
+  InterventionPlaybookStep,
   RiskLevel,
   TaskItem,
   TaskStatus,
@@ -23,7 +29,7 @@ import type {
 } from "@/lib/types"
 
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") || "http://localhost:8000"
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "")
 
 interface QueueApiResponse {
   queue_rank: number
@@ -87,7 +93,7 @@ interface TaskApiResponse {
 interface ReminderApiResponse {
   invoice_id: string
   channel: string
-  ai_recommended_channel: string   // ← new: what AI suggests
+  recommended_channel: string
   message: string
 }
 
@@ -227,9 +233,83 @@ interface DsoAnalyticsApiResponse {
   average_daily_sales: number
   trailing_sales: number
   bottleneck_stages: DsoBottleneckStageApiResponse[]
-  ai_recommendation: DsoRecommendationApiResponse
+  recommendation: DsoRecommendationApiResponse
   process_efficiency: DsoProcessMetricApiResponse[]
   data_notes: string[]
+}
+
+interface BehavioralScorecardApiResponse {
+  account_name: string
+  payer_category: string
+  average_days_to_pay: number
+  ignored_reminders: number
+  observed_reminders: number
+  total_outstanding_balance: number
+  preferred_channel: string
+  best_send_day: string
+  best_send_time_window: string
+  fallback_layer: "Vendor-specific history" | "Segment-level pattern" | "Global hospital trend"
+  vendor_history_count: number
+  manual_review_required: boolean
+  is_new_account: boolean
+  note: string
+}
+
+interface InterventionPlaybookStepApiResponse {
+  action: string
+  channel: string
+  timing: string
+  estimated_success_probability: number
+  requires_approval: boolean
+  automation_level: "Automated" | "Manual approval"
+  rationale: string
+}
+
+interface InterventionPlaybookApiResponse {
+  invoice_id: string
+  account_name: string
+  model_name: string
+  source_mode: string
+  generated_at: string
+  similar_case_basis: string
+  steps: InterventionPlaybookStepApiResponse[]
+  approval_summary: {
+    automated_steps: number
+    manual_steps: number
+  }
+}
+
+interface IngestionIssueApiResponse {
+  row_number: number
+  invoice_id: string | null
+  issues: string[]
+}
+
+interface IngestionPreviewApiResponse {
+  preview_id: string
+  filename: string
+  source_mode: string
+  mapping: Record<string, string>
+  preview_rows: Record<string, string | number | boolean | null>[]
+  summary: {
+    total_rows: number
+    valid_rows: number
+    invalid_rows: number
+    duplicate_rows: number
+    existing_duplicates: number
+  }
+  issues: IngestionIssueApiResponse[]
+  required_fields: string[]
+}
+
+interface IngestionConfirmApiResponse {
+  preview_id: string
+  filename: string
+  source_mode: string
+  imported_rows: number
+  skipped_rows: number
+  valid_rows: number
+  invalid_rows: number
 }
 
 export interface QueueCustomer {
@@ -281,7 +361,7 @@ export interface RiskProfile {
 export interface ReminderDraft {
   invoiceId: string
   channel: Channel               // channel the message was generated for (user's choice)
-  aiRecommendedChannel: string
+  recommendedChannel: string
   message: string
 }
 
@@ -436,7 +516,7 @@ function mapReminder(item: ReminderApiResponse): ReminderDraft {
   return {
     invoiceId: item.invoice_id,
     channel: normalizeChannel(item.channel),
-    aiRecommendedChannel: item.ai_recommended_channel,
+    recommendedChannel: item.recommended_channel,
     message: item.message,
   }
 }
@@ -619,9 +699,95 @@ function mapDsoAnalytics(item: DsoAnalyticsApiResponse): DsoAnalytics {
     averageDailySales: item.average_daily_sales,
     trailingSales: item.trailing_sales,
     bottleneckStages: item.bottleneck_stages.map(mapDsoBottleneckStage),
-    aiRecommendation: mapDsoRecommendation(item.ai_recommendation),
+    recommendation: mapDsoRecommendation(item.recommendation),
     processEfficiency: item.process_efficiency.map(mapDsoProcessMetric),
     dataNotes: item.data_notes,
+  }
+}
+
+function mapBehavioralScorecard(item: BehavioralScorecardApiResponse): BehavioralScorecard {
+  return {
+    accountName: item.account_name,
+    payerCategory: item.payer_category,
+    averageDaysToPay: item.average_days_to_pay,
+    ignoredReminders: item.ignored_reminders,
+    observedReminders: item.observed_reminders,
+    totalOutstandingBalance: item.total_outstanding_balance,
+    preferredChannel: normalizeChannel(item.preferred_channel),
+    bestSendDay: item.best_send_day,
+    bestSendTimeWindow: item.best_send_time_window,
+    fallbackLayer: item.fallback_layer,
+    vendorHistoryCount: item.vendor_history_count,
+    manualReviewRequired: item.manual_review_required,
+    isNewAccount: item.is_new_account,
+    note: item.note,
+  }
+}
+
+function mapInterventionPlaybookStep(item: InterventionPlaybookStepApiResponse): InterventionPlaybookStep {
+  return {
+    action: item.action,
+    channel: item.channel,
+    timing: item.timing,
+    estimatedSuccessProbability: item.estimated_success_probability,
+    requiresApproval: item.requires_approval,
+    automationLevel: item.automation_level,
+    rationale: item.rationale,
+  }
+}
+
+function mapInterventionPlaybook(item: InterventionPlaybookApiResponse): InterventionPlaybook {
+  return {
+    invoiceId: item.invoice_id,
+    accountName: item.account_name,
+    modelName: item.model_name,
+    sourceMode: item.source_mode,
+    generatedAt: item.generated_at,
+    similarCaseBasis: item.similar_case_basis,
+    steps: item.steps.map(mapInterventionPlaybookStep),
+    approvalSummary: {
+      automatedSteps: item.approval_summary.automated_steps,
+      manualSteps: item.approval_summary.manual_steps,
+    },
+  }
+}
+
+function mapIngestionIssue(item: IngestionIssueApiResponse): IngestionIssue {
+  return {
+    rowNumber: item.row_number,
+    invoiceId: item.invoice_id,
+    issues: item.issues,
+  }
+}
+
+function mapIngestionPreview(item: IngestionPreviewApiResponse): IngestionPreview {
+  return {
+    previewId: item.preview_id,
+    filename: item.filename,
+    sourceMode: item.source_mode,
+    mapping: item.mapping,
+    previewRows: item.preview_rows,
+    summary: {
+      totalRows: item.summary.total_rows,
+      validRows: item.summary.valid_rows,
+      invalidRows: item.summary.invalid_rows,
+      duplicateRows: item.summary.duplicate_rows,
+      existingDuplicates: item.summary.existing_duplicates,
+    },
+    issues: item.issues.map(mapIngestionIssue),
+    requiredFields: item.required_fields,
+  }
+}
+
+function mapIngestionConfirmResult(item: IngestionConfirmApiResponse): IngestionConfirmResult {
+  return {
+    previewId: item.preview_id,
+    filename: item.filename,
+    sourceMode: item.source_mode,
+    importedRows: item.imported_rows,
+    skippedRows: item.skipped_rows,
+    validRows: item.valid_rows,
+    invalidRows: item.invalid_rows,
   }
 }
 
@@ -644,10 +810,11 @@ function mapInteraction(item: Record<string, unknown>, index: number): Interacti
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = options.body instanceof FormData
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers || {}),
     },
   })
@@ -705,6 +872,34 @@ export async function fetchDsoAnalytics() {
   return mapDsoAnalytics(data)
 }
 
+export async function fetchBehavioralScorecards() {
+  const data = await apiFetch<BehavioralScorecardApiResponse[]>("/api/behavioral-scorecards")
+  return data.map(mapBehavioralScorecard)
+}
+
+export async function fetchInterventionPlaybook(invoiceId: string) {
+  const data = await apiFetch<InterventionPlaybookApiResponse>(`/api/playbooks/${encodeURIComponent(invoiceId)}`)
+  return mapInterventionPlaybook(data)
+}
+
+export async function previewIngestion(file: File) {
+  const body = new FormData()
+  body.append("file", file)
+  const data = await apiFetch<IngestionPreviewApiResponse>("/api/ingestion/preview", {
+    method: "POST",
+    body,
+  })
+  return mapIngestionPreview(data)
+}
+
+export async function confirmIngestion(previewId: string) {
+  const data = await apiFetch<IngestionConfirmApiResponse>("/api/ingestion/confirm", {
+    method: "POST",
+    body: JSON.stringify({ preview_id: previewId }),
+  })
+  return mapIngestionConfirmResult(data)
+}
+
 export async function fetchTasks() {
   const data = await apiFetch<TaskApiResponse[]>("/api/tasks")
   return data.map(mapTask)
@@ -720,7 +915,6 @@ export async function updateTask(id: string, status: string, note?: string) {
 }
 
 // Pass user's chosen channel to backend so message is generated for that channel.
-// Backend will also return aiRecommendedChannel separately for UI badge display.
 export async function generateReminder(invoiceId: string, userChannel?: Channel) {
   const body: Record<string, string> = { invoice_id: invoiceId }
   if (userChannel) {

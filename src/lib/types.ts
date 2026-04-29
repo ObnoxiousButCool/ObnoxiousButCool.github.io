@@ -72,6 +72,8 @@ export interface CustomerAccount {
   partialRate?: number
   recoveryRate?: number
   avgDaysLate?: number
+  behavioralScorecard?: BehavioralScorecard
+  interventionPlaybook?: InterventionPlaybook
 }
 
 export interface TriageItem {
@@ -237,9 +239,83 @@ export interface DsoAnalytics {
   averageDailySales: number
   trailingSales: number
   bottleneckStages: DsoBottleneckStage[]
-  aiRecommendation: DsoRecommendation
+  recommendation: DsoRecommendation
   processEfficiency: DsoProcessMetric[]
   dataNotes: string[]
+}
+
+export interface BehavioralScorecard {
+  accountName: string
+  payerCategory: string
+  averageDaysToPay: number
+  ignoredReminders: number
+  observedReminders: number
+  totalOutstandingBalance: number
+  preferredChannel: Channel
+  bestSendDay: string
+  bestSendTimeWindow: string
+  fallbackLayer: "Vendor-specific history" | "Segment-level pattern" | "Global hospital trend"
+  vendorHistoryCount: number
+  manualReviewRequired: boolean
+  isNewAccount: boolean
+  note: string
+}
+
+export interface InterventionPlaybookStep {
+  action: string
+  channel: string
+  timing: string
+  estimatedSuccessProbability: number
+  requiresApproval: boolean
+  automationLevel: "Automated" | "Manual approval"
+  rationale: string
+}
+
+export interface InterventionPlaybook {
+  invoiceId: string
+  accountName: string
+  modelName: string
+  sourceMode: string
+  generatedAt: string
+  similarCaseBasis: string
+  steps: InterventionPlaybookStep[]
+  approvalSummary: {
+    automatedSteps: number
+    manualSteps: number
+  }
+}
+
+export interface IngestionIssue {
+  rowNumber: number
+  invoiceId: string | null
+  issues: string[]
+}
+
+export interface IngestionPreview {
+  previewId: string
+  filename: string
+  sourceMode: string
+  mapping: Record<string, string>
+  previewRows: Record<string, string | number | boolean | null>[]
+  summary: {
+    totalRows: number
+    validRows: number
+    invalidRows: number
+    duplicateRows: number
+    existingDuplicates: number
+  }
+  issues: IngestionIssue[]
+  requiredFields: string[]
+}
+
+export interface IngestionConfirmResult {
+  previewId: string
+  filename: string
+  sourceMode: string
+  importedRows: number
+  skippedRows: number
+  validRows: number
+  invalidRows: number
 }
 
 export interface TriageResult {

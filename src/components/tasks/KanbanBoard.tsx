@@ -37,6 +37,7 @@ export function KanbanBoard() {
       Open: tasks.filter((task) => task.status === "Open"),
       "In Progress": tasks.filter((task) => task.status === "In Progress"),
       Closed: tasks.filter((task) => task.status === "Closed"),
+      
     }),
     [tasks]
   )
