@@ -152,6 +152,22 @@ export function DefaulterQueueTable({
         header: "Modifier",
         cell: ({ row }) => {
           const modifierType = row.original.modifierType
+          const incentiveApproved = row.original.incentiveApproved === true || row.original.incentiveApproved === 1
+          const approvedDiscountPct = row.original.approvedDiscountPct || 0
+          const approvedDiscountAmount = row.original.approvedDiscountAmount || 0
+
+          if (incentiveApproved) {
+            return (
+              <div>
+                <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", modifierStyles.Incentive)}>
+                  -{approvedDiscountPct}% discount
+                </span>
+                <p className="mt-1 text-xs text-[#9CA3AF]">
+                  A {approvedDiscountPct}% discount of {formatCurrency(approvedDiscountAmount)} has been approved.
+                </p>
+              </div>
+            )
+          }
 
           return (
             <div>
