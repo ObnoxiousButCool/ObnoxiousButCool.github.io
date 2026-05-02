@@ -42,6 +42,28 @@ function RewardTierBadge({ tier }: { tier: RewardTier }) {
   )
 }
 
+function rewardBanner(customer: CustomerAccount) {
+  if (customer.rewardTier === "Gold") {
+    return {
+      className: "bg-[#FEF3C7] text-[#92400E]",
+      text: "⭐ Trusted Partner — 1% rebate applied. Message tone adjusted automatically.",
+    }
+  }
+  if (customer.rewardTier === "Silver") {
+    return {
+      className: "bg-[#E5E7EB] text-[#374151]",
+      text: "✦ Preferred Payer — 0.5% rebate applied. Message tone adjusted automatically.",
+    }
+  }
+  if (customer.rewardTier === "Bronze") {
+    return {
+      className: "bg-[#DBEAFE] text-[#1E40AF]",
+      text: "◆ Bronze tier — Health checkup voucher eligible. Mentioned in message.",
+    }
+  }
+  return null
+}
+
 export function ComposerPanel({
   customer,
   onSend,
@@ -55,6 +77,7 @@ export function ComposerPanel({
   const [message, setMessage] = useState(customer.draftMessage)
   const [isSending, setIsSending] = useState(false)
   const incentiveApproved = customer.incentiveApproved === true || customer.incentiveApproved === 1
+  const tierBanner = rewardBanner(customer)
 
   useEffect(() => {
     setChannel(normalizeChannel(customer.recommendedChannel))
@@ -66,6 +89,11 @@ export function ComposerPanel({
       {incentiveApproved ? (
         <p className="mb-3 rounded-xl bg-[#ECFDF5] px-3 py-2 text-xs font-semibold leading-5 text-[#047857]">
           {"\u2713"} Incentive approved: {customer.approvedDiscountPct || 0}% discount ({formatCurrency(customer.approvedDiscountAmount || 0)}) - included in message
+        </p>
+      ) : null}
+      {tierBanner ? (
+        <p className={cn("mb-3 rounded-xl px-3 py-2 text-xs font-semibold leading-5", tierBanner.className)}>
+          {tierBanner.text}
         </p>
       ) : null}
 
