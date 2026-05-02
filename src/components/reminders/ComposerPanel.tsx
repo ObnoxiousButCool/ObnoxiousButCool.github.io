@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react"
+import { AlertTriangle, Crown } from "lucide-react"
 
 import { CreditsIndicator } from "@/components/reminders/CreditsIndicator"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import type { Channel, CustomerAccount } from "@/lib/types"
+import { fetchRewardForAccount } from "@/lib/api"
+import type { Channel, CustomerAccount, PayerReward, RewardTier } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 const channels: Channel[] = ["Email", "SMS", "WhatsApp"]
@@ -21,6 +24,22 @@ function normalizeChannel(value?: string): Channel {
     return value
   }
   return "Email"
+}
+
+const rewardTierStyles: Record<RewardTier, string> = {
+  Gold: "bg-[#FEF3C7] text-[#92400E]",
+  Silver: "bg-[#E5E7EB] text-[#374151]",
+  Bronze: "bg-[#FFEDD5] text-[#9A3412]",
+  None: "bg-[#F3F4F6] text-[#6B7280]",
+}
+
+function RewardTierBadge({ tier }: { tier: RewardTier }) {
+  return (
+    <Badge className={cn("border-transparent font-semibold", rewardTierStyles[tier])}>
+      {tier === "Gold" ? <Crown className="h-3 w-3" /> : null}
+      {tier}
+    </Badge>
+  )
 }
 
 export function ComposerPanel({
@@ -119,6 +138,25 @@ export function ComposerPanel({
 export function AccountDetailPanel({ customer }: { customer: CustomerAccount }) {
   const scorecard = customer.behavioralScorecard
   const playbook = customer.interventionPlaybook
+  const [reward, setReward] = useState<PayerReward | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadReward = async () => {
+      try {
+        const data = await fetchRewardForAccount(customer.customerName)
+        if (isMounted) setReward(data)
+      } catch {
+        if (isMounted) setReward(null)
+      }
+    }
+
+    void loadReward()
+    return () => {
+      isMounted = false
+    }
+  }, [customer.customerName])
 
   return (
     <div className="flex max-h-[760px] flex-col overflow-y-auto rounded-2xl bg-white p-5 card-shadow">
@@ -227,6 +265,31 @@ export function AccountDetailPanel({ customer }: { customer: CustomerAccount }) 
             </div>
 
             <p className="mt-3 text-xs leading-5 text-[#6B7280]">{scorecard.note}</p>
+
+            {reward ? (
+              <div className="mt-4 rounded-2xl bg-[#F8FAFC] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[#111827]">Prompt payer rewards</p>
+                    <p className="mt-1 text-xs text-[#6B7280]">
+                      {reward.onTimeRate.toFixed(1)}% on-time payment rate
+                    </p>
+                  </div>
+                  <RewardTierBadge tier={reward.tier} />
+                </div>
+                {reward.tier === "Gold" || reward.tier === "Silver" ? (
+                  <p className="mt-3 text-xs font-semibold text-[#047857]">
+                    {reward.rebatePct}% rebate active for this payer.
+                  </p>
+                ) : null}
+                {reward.atRiskOfDowngrade ? (
+                  <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-semibold text-[#92400E]">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    At risk of tier downgrade
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

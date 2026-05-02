@@ -22,7 +22,9 @@ import type {
   IngestionPreview,
   InterventionPlaybook,
   InterventionPlaybookStep,
+  PayerReward,
   RiskLevel,
+  RewardTier,
   TaskItem,
   TaskStatus,
   TriageResult,
@@ -66,6 +68,22 @@ interface QueueApiResponse {
   incentive_approved: number
   approved_discount_pct: number
   approved_discount_amount: number
+  reward_rebate_pct: number
+  reward_tier: string
+}
+
+interface PayerRewardApiResponse {
+  id?: number
+  account_name: string
+  total_invoices: number
+  on_time_payments: number
+  early_payments: number
+  on_time_rate: number
+  tier: string
+  rebate_pct: number
+  reward_label: string
+  tier_updated_at: string | null
+  at_risk_of_downgrade: number | boolean
 }
 
 interface ProfileApiResponse {
@@ -350,6 +368,8 @@ export interface QueueCustomer {
   incentiveApproved: number
   approvedDiscountPct: number
   approvedDiscountAmount: number
+  rewardRebatePct: number
+  rewardTier: RewardTier | ""
 }
 
 export interface RiskProfile {
@@ -435,6 +455,13 @@ function normalizeChannelList(values: string[] | undefined): Channel[] {
   return (values || []).map(normalizeChannel).filter((value, index, all) => all.indexOf(value) === index)
 }
 
+function normalizeRewardTier(value: string | undefined | null): RewardTier | "" {
+  if (value === "Gold" || value === "Silver" || value === "Bronze" || value === "None") {
+    return value
+  }
+  return ""
+}
+
 function normalizeTaskStatus(value: string): TaskStatus {
   const normalized = value.trim().toLowerCase()
   if (normalized === "in progress") {
@@ -482,6 +509,24 @@ function mapQueueItem(item: QueueApiResponse): QueueCustomer {
     incentiveApproved: item.incentive_approved,
     approvedDiscountPct: item.approved_discount_pct,
     approvedDiscountAmount: item.approved_discount_amount,
+    rewardRebatePct: item.reward_rebate_pct,
+    rewardTier: normalizeRewardTier(item.reward_tier),
+  }
+}
+
+function mapPayerReward(item: PayerRewardApiResponse): PayerReward {
+  return {
+    id: item.id,
+    accountName: item.account_name,
+    totalInvoices: item.total_invoices,
+    onTimePayments: item.on_time_payments,
+    earlyPayments: item.early_payments,
+    onTimeRate: item.on_time_rate,
+    tier: normalizeRewardTier(item.tier) || "None",
+    rebatePct: item.rebate_pct,
+    rewardLabel: item.reward_label,
+    tierUpdatedAt: item.tier_updated_at,
+    atRiskOfDowngrade: item.at_risk_of_downgrade === true || item.at_risk_of_downgrade === 1,
   }
 }
 
@@ -884,6 +929,23 @@ export async function fetchDsoAnalytics() {
 export async function fetchBehavioralScorecards() {
   const data = await apiFetch<BehavioralScorecardApiResponse[]>("/api/behavioral-scorecards")
   return data.map(mapBehavioralScorecard)
+}
+
+export async function fetchRewards() {
+  const data = await apiFetch<PayerRewardApiResponse[]>("/api/rewards")
+  return data.map(mapPayerReward)
+}
+
+export async function recalculateRewards() {
+  const data = await apiFetch<PayerRewardApiResponse[]>("/api/rewards/recalculate", {
+    method: "POST",
+  })
+  return data.map(mapPayerReward)
+}
+
+export async function fetchRewardForAccount(accountName: string) {
+  const data = await apiFetch<PayerRewardApiResponse>(`/api/rewards/${encodeURIComponent(accountName)}`)
+  return mapPayerReward(data)
 }
 
 export async function fetchInterventionPlaybook(invoiceId: string) {

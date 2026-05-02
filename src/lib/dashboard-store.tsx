@@ -206,6 +206,8 @@ function toCustomerAccount(
     incentiveApproved: customer.incentiveApproved,
     approvedDiscountPct: customer.approvedDiscountPct,
     approvedDiscountAmount: customer.approvedDiscountAmount,
+    rewardRebatePct: customer.rewardRebatePct,
+    rewardTier: customer.rewardTier,
     riskScore: profile?.riskScore,
     payerCategory: profile?.payerCategory,
     defaulterFlag: profile?.defaulterFlag,

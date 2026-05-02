@@ -96,6 +96,18 @@ export function DefaulterQueueTable({
                   VIP
                 </span>
               ) : null}
+              {row.original.rewardTier === "Gold" || row.original.rewardTier === "Silver" ? (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                    row.original.rewardTier === "Gold"
+                      ? "bg-[#FEF3C7] text-[#92400E]"
+                      : "bg-[#E5E7EB] text-[#374151]"
+                  )}
+                >
+                  {row.original.rewardTier}
+                </span>
+              ) : null}
               {row.original.cfoNotificationRequired ? (
                 <span className="rounded-full bg-[#111827] px-2 py-0.5 text-[10px] font-semibold text-white">
                   CFO

@@ -2,6 +2,7 @@ export type AgingBucketType = "30 days" | "45 days" | "60+ days"
 export type RiskLevel = "High Risk" | "Watch" | "Normal"
 export type ModifierType = "Penalty" | "Incentive"
 export type Channel = "Email" | "SMS" | "WhatsApp"
+export type RewardTier = "Gold" | "Silver" | "Bronze" | "None"
 export type AmountTier = "<₹10K" | "₹10K–₹50K" | "₹50K–₹1L" | ">₹1L"
 export type TriageClassification = "Commitment" | "Disputed" | "No response"
 export type TaskStatus = "Open" | "In Progress" | "Closed"
@@ -68,6 +69,8 @@ export interface CustomerAccount {
   incentiveApproved?: boolean | number
   approvedDiscountPct?: number
   approvedDiscountAmount?: number
+  rewardRebatePct?: number
+  rewardTier?: RewardTier | ""
   riskScore?: number
   payerCategory?: string
   defaulterFlag?: boolean
@@ -262,6 +265,20 @@ export interface BehavioralScorecard {
   manualReviewRequired: boolean
   isNewAccount: boolean
   note: string
+}
+
+export interface PayerReward {
+  id?: number
+  accountName: string
+  totalInvoices: number
+  onTimePayments: number
+  earlyPayments: number
+  onTimeRate: number
+  tier: RewardTier
+  rebatePct: number
+  rewardLabel: string
+  tierUpdatedAt: string | null
+  atRiskOfDowngrade: boolean
 }
 
 export interface InterventionPlaybookStep {
