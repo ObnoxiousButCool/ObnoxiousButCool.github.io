@@ -338,6 +338,35 @@ export interface IngestionConfirmResult {
   invalidRows: number
 }
 
+export type DocumentCheckStatus = "pass" | "fail" | "warning"
+export type DocumentVerdict = "ready" | "issues_found"
+
+export interface DocumentValidationCheck {
+  item: string
+  status: DocumentCheckStatus
+  note: string
+}
+
+export interface DocumentValidationResult {
+  ocrEngine: "paddle" | "tesseract" | "pypdf" | string
+  checks: DocumentValidationCheck[]
+  verdict: DocumentVerdict
+  estimatedDelayDays: number
+  summary: string
+  insurerName: string | null
+  insurerSpecificNotes: string[]
+  error?: string | null
+}
+
+export interface RejectionPattern {
+  id: number
+  insurerName: string
+  pattern: string
+  occurrenceCount: number
+  createdAt: string | null
+  lastSeenAt: string | null
+}
+
 export interface TriageResult {
   invoiceId: string
   category: string

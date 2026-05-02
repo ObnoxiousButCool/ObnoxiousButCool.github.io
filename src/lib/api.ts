@@ -12,6 +12,7 @@ import type {
   CfoPayerPrediction,
   CfoScenario,
   Channel,
+  DocumentValidationResult,
   DsoAnalytics,
   DsoBottleneckStage,
   DsoProcessMetric,
@@ -23,6 +24,7 @@ import type {
   InterventionPlaybook,
   InterventionPlaybookStep,
   PayerReward,
+  RejectionPattern,
   RiskLevel,
   RewardTier,
   TaskItem,
@@ -331,6 +333,30 @@ interface IngestionConfirmApiResponse {
   skipped_rows: number
   valid_rows: number
   invalid_rows: number
+}
+
+interface DocumentValidationApiResponse {
+  ocr_engine: string
+  checks: {
+    item: string
+    status: "pass" | "fail" | "warning"
+    note: string
+  }[]
+  verdict: "ready" | "issues_found"
+  estimated_delay_days: number
+  summary: string
+  insurer_name: string | null
+  insurer_specific_notes?: string[]
+  error?: string | null
+}
+
+interface RejectionPatternApiResponse {
+  id: number
+  insurer_name: string
+  pattern: string
+  occurrence_count: number
+  created_at: string | null
+  last_seen_at: string | null
 }
 
 export interface QueueCustomer {
@@ -845,6 +871,30 @@ function mapIngestionConfirmResult(item: IngestionConfirmApiResponse): Ingestion
   }
 }
 
+function mapDocumentValidationResult(item: DocumentValidationApiResponse): DocumentValidationResult {
+  return {
+    ocrEngine: item.ocr_engine,
+    checks: item.checks || [],
+    verdict: item.verdict,
+    estimatedDelayDays: item.estimated_delay_days,
+    summary: item.summary,
+    insurerName: item.insurer_name,
+    insurerSpecificNotes: item.insurer_specific_notes || [],
+    error: item.error,
+  }
+}
+
+function mapRejectionPattern(item: RejectionPatternApiResponse): RejectionPattern {
+  return {
+    id: item.id,
+    insurerName: item.insurer_name,
+    pattern: item.pattern,
+    occurrenceCount: item.occurrence_count,
+    createdAt: item.created_at,
+    lastSeenAt: item.last_seen_at,
+  }
+}
+
 function mapInteraction(item: Record<string, unknown>, index: number): InteractionLog {
   const fallbackId = `interaction-${index}-${String(item.invoice_id ?? item.id ?? "entry")}`
   const timestamp = String(item.timestamp ?? item.created_date ?? item.created_at ?? item.date ?? item.logged_at ?? "Unknown")
@@ -969,6 +1019,34 @@ export async function confirmIngestion(previewId: string) {
     body: JSON.stringify({ preview_id: previewId }),
   })
   return mapIngestionConfirmResult(data)
+}
+
+export async function validateDocument(file: File, insurerName?: string) {
+  const body = new FormData()
+  body.append("file", file)
+  if (insurerName?.trim()) {
+    body.append("insurer_name", insurerName.trim())
+  }
+  const data = await apiFetch<DocumentValidationApiResponse>("/api/documents/validate", {
+    method: "POST",
+    body,
+  })
+  return mapDocumentValidationResult(data)
+}
+
+export async function fetchRejectionPatterns(insurerName: string) {
+  const data = await apiFetch<RejectionPatternApiResponse[]>(
+    `/api/documents/rejection-patterns/${encodeURIComponent(insurerName)}`
+  )
+  return data.map(mapRejectionPattern)
+}
+
+export async function addRejectionPattern(insurerName: string, pattern: string) {
+  await apiFetch<{ success: boolean }>("/api/documents/rejection-patterns", {
+    method: "POST",
+    body: JSON.stringify({ insurer_name: insurerName, pattern }),
+  })
+  return fetchRejectionPatterns(insurerName)
 }
 
 export async function fetchTasks() {

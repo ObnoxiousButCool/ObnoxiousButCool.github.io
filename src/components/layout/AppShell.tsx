@@ -11,6 +11,7 @@ const pageMeta: Record<string, { title: string; action?: string }> = {
   "/tasks": { title: "Tasks" },
   "/cfo": { title: "CFO View" },
   "/mapper": { title: "Data Mapper" },
+  "/documents": { title: "Doc Validation" },
   "/insights": { title: "DSO Analytics" },
 }
 
